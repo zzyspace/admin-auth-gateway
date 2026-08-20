@@ -1,0 +1,4 @@
+auth_request /_admin_auth_reimbursement;
+auth_request_set $admin_authorization $upstream_http_x_admin_authorization;
+proxy_set_header Authorization $admin_authorization;
+proxy_hide_header WWW-Authenticate;

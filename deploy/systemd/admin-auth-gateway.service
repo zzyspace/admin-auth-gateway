@@ -1,0 +1,36 @@
+[Unit]
+Description=Shared admin authentication gateway
+After=network.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+WorkingDirectory=/opt/admin-auth-gateway/current
+EnvironmentFile=/etc/invoice-submit.env
+EnvironmentFile=/etc/wechat-claw.env
+Environment=NODE_ENV=production
+Environment=ADMIN_AUTH_HOST=127.0.0.1
+Environment=ADMIN_AUTH_PORT=8790
+Environment=ADMIN_AUTH_STATE_DIR=/var/lib/admin-auth-gateway
+Environment=ADMIN_AUTH_COOKIE_NAME=__Host-admin_session
+Environment=ADMIN_AUTH_COOKIE_SECURE=true
+Environment=ADMIN_AUTH_SESSION_TTL_SECONDS=2592000
+# Optional temporary overrides, for example the reversible HTTP trial file.
+EnvironmentFile=-/etc/admin-auth-gateway.env
+ExecStart=/usr/bin/node server/index.js
+Restart=on-failure
+RestartSec=3
+StateDirectory=admin-auth-gateway
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target
