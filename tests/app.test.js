@@ -107,6 +107,29 @@ test("login page sanitizes external return destinations and sets CSRF cookie", a
   assert.match(response.headers.get("set-cookie"), /admin_login_csrf=.*HttpOnly.*SameSite=Strict/i);
   assert.match(response.headers.get("content-security-policy"), /form-action 'self'/);
   assert.equal(response.headers.get("x-frame-options"), "DENY");
+
+  const nearMissResponse = await fetch(
+    `${fixture.baseUrl}/admin-login?returnTo=${encodeURIComponent("/reimbursement/submit_other")}`,
+  );
+  assert.match(await nearMissResponse.text(), /name="returnTo" value="\/invoice"/);
+});
+
+test("login page preserves exact batch reimbursement destinations", async (t) => {
+  const fixture = await startFixture();
+  t.after(() => fixture.close());
+
+  for (const returnTo of [
+    "/reimbursement/submit",
+    "/reimbursement/submit_fuzzy",
+    "/reimbursement/submit_peanut",
+    "/reimbursement/submit_fuzzyqz",
+  ]) {
+    const response = await fetch(
+      `${fixture.baseUrl}/admin-login?returnTo=${encodeURIComponent(returnTo)}`,
+    );
+    assert.equal(response.status, 200);
+    assert.match(await response.text(), new RegExp(`name="returnTo" value="${returnTo}"`));
+  }
 });
 
 test("production configuration emits a host-wide Secure session cookie", async (t) => {
@@ -184,6 +207,24 @@ test("reimbursement guest cannot obtain invoice scope", async (t) => {
   const invoice = await verify(fixture, { cookie, scope: "invoice" });
   assert.equal(invoice.status, 401);
   assert.equal(invoice.headers.get("www-authenticate"), null);
+});
+
+test("reimbursement guest can log in from a batch reimbursement destination", async (t) => {
+  const fixture = await startFixture();
+  t.after(() => fixture.close());
+  const response = await login(fixture, {
+    username: "reimbursement-guest",
+    password: "guest-password",
+    returnTo: "/reimbursement/submit_fuzzyqz",
+  });
+  assert.equal(response.status, 303);
+  assert.equal(response.headers.get("location"), "/reimbursement/submit_fuzzyqz");
+  const cookie = cookieFrom(response, "admin_session");
+
+  const reimbursement = await verify(fixture, { cookie, scope: "reimbursement" });
+  assert.equal(reimbursement.status, 204);
+  assert.equal(reimbursement.headers.get("x-admin-role"), "readonly");
+  assert.equal((await verify(fixture, { cookie, scope: "invoice" })).status, 401);
 });
 
 test("credentials for the wrong destination do not create a session", async (t) => {

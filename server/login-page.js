@@ -2,6 +2,10 @@ const ALLOWED_RETURN_PATHS = [
   /^\/invoice\/?$/,
   /^\/employee\/portal\/?$/,
   /^\/reimbursement\/?$/,
+  /^\/reimbursement\/submit\/?$/,
+  /^\/reimbursement\/submit_fuzzy\/?$/,
+  /^\/reimbursement\/submit_peanut\/?$/,
+  /^\/reimbursement\/submit_fuzzyqz\/?$/,
 ];
 
 export function sanitizeReturnTo(value) {
