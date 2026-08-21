@@ -50,3 +50,10 @@ test("upstream auth snippets overwrite Authorization and hide Basic challenges",
     assert.match(snippet, /proxy_hide_header WWW-Authenticate;/);
   }
 });
+
+test("gateway deployment leaves the shared Nginx entry to server-infra", () => {
+  const deployScript = read("deploy/deploy-admin-auth-gateway.sh");
+  assert.doesNotMatch(deployScript, /\/etc\/nginx\/snippets/);
+  assert.doesNotMatch(deployScript, /\bnginx -t\b/);
+  assert.doesNotMatch(deployScript, /systemctl reload nginx/);
+});

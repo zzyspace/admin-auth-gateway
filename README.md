@@ -76,15 +76,12 @@ sandbox they may need to be run with local-listen permission.
 /opt/admin-auth-gateway/current
 /var/lib/admin-auth-gateway/sessions.db
 /etc/systemd/system/admin-auth-gateway.service
-/etc/nginx/snippets/admin-auth-gateway.locations.conf
-/etc/nginx/snippets/admin-auth-invoice.inc
-/etc/nginx/snippets/admin-auth-reimbursement.inc
 ```
 
-The systemd service loads both existing credential files. Deploying this service
-does not automatically protect the three backends; that safety boundary prevents
-an accidental HTTP-only or partial rollout. Complete HTTPS first, then follow
-[docs/nginx-integration.md](docs/nginx-integration.md).
+The systemd service loads both existing credential files. The deployment script
+only manages this service; shared Nginx routes and auth snippets are published by
+the independent `server-infra` project. Files under `deploy/nginx/` are retained
+as migration-era compatibility snapshots and are not installed by this script.
 
 ### Temporary HTTP trial
 

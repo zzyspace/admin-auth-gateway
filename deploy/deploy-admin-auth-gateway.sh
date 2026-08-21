@@ -8,7 +8,6 @@ MODE="${2:-production}"
 APP_DIR="/opt/admin-auth-gateway/current"
 SERVICE_NAME="admin-auth-gateway.service"
 SYSTEMD_UNIT_DIR="/etc/systemd/system"
-NGINX_SNIPPET_DIR="/etc/nginx/snippets"
 HEALTHZ_URL="http://127.0.0.1:8790/healthz"
 
 SSH_OPTS=(
@@ -22,9 +21,8 @@ usage() {
 Usage:
   bash deploy/deploy-admin-auth-gateway.sh [server] [production|http-trial]
 
-The checkout must already exist at ${APP_DIR}. This installs and restarts the
-gateway service and installs nginx snippets, but deliberately does not enable
-the protected routes. HTTPS and the integration changes must be validated first.
+The checkout must already exist at ${APP_DIR}. This installs and restarts only
+the gateway service. Shared Nginx configuration is managed by server-infra.
 
 The explicit http-trial mode installs a temporary seven-day non-Secure Cookie
 override at /etc/admin-auth-gateway.env. Production mode removes that override.
@@ -51,7 +49,7 @@ run_release() {
     exit 1
   fi
 
-  for cmd in curl git install nginx node npm systemctl; do
+  for cmd in curl git install node npm systemctl; do
     command -v "${cmd}" >/dev/null 2>&1 || {
       echo "Missing required command: ${cmd}" >&2
       exit 1
@@ -79,15 +77,9 @@ run_release() {
   echo "[deploy] Running tests"
   npm --prefix "${APP_DIR}" test
 
-  echo "[deploy] Installing systemd unit and nginx snippets"
+  echo "[deploy] Installing systemd unit"
   install -m 0644 "${APP_DIR}/deploy/systemd/admin-auth-gateway.service" \
     "${SYSTEMD_UNIT_DIR}/${SERVICE_NAME}"
-  install -m 0644 "${APP_DIR}/deploy/nginx/admin-auth-gateway.locations.conf" \
-    "${NGINX_SNIPPET_DIR}/admin-auth-gateway.locations.conf"
-  install -m 0644 "${APP_DIR}/deploy/nginx/admin-auth-invoice.inc" \
-    "${NGINX_SNIPPET_DIR}/admin-auth-invoice.inc"
-  install -m 0644 "${APP_DIR}/deploy/nginx/admin-auth-reimbursement.inc" \
-    "${NGINX_SNIPPET_DIR}/admin-auth-reimbursement.inc"
 
   case "${MODE}" in
     production)
@@ -115,9 +107,8 @@ run_release() {
     exit 1
   fi
 
-  nginx -t
+  echo "[deploy] Shared Nginx entry is managed by server-infra"
   echo "[deploy] Gateway is running in ${MODE} mode."
-  echo "[deploy] Protected routes are not enabled by this script."
 }
 
 case "${SERVER}" in
@@ -130,5 +121,5 @@ esac
 if [[ "${SERVER}" == "local" || "${SERVER}" == "localhost" ]]; then
   run_release
 else
-  ssh "${SSH_OPTS[@]}" "${SERVER}" "$(declare -f wait_for_health); $(declare -f run_release); APP_DIR='${APP_DIR}'; SERVICE_NAME='${SERVICE_NAME}'; SYSTEMD_UNIT_DIR='${SYSTEMD_UNIT_DIR}'; NGINX_SNIPPET_DIR='${NGINX_SNIPPET_DIR}'; HEALTHZ_URL='${HEALTHZ_URL}'; MODE='${MODE}'; run_release"
+  ssh "${SSH_OPTS[@]}" "${SERVER}" "$(declare -f wait_for_health); $(declare -f run_release); APP_DIR='${APP_DIR}'; SERVICE_NAME='${SERVICE_NAME}'; SYSTEMD_UNIT_DIR='${SYSTEMD_UNIT_DIR}'; HEALTHZ_URL='${HEALTHZ_URL}'; MODE='${MODE}'; run_release"
 fi
