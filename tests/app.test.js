@@ -256,6 +256,38 @@ test("reimbursement partner cannot obtain invoice scope", async (t) => {
   assert.equal(invoice.headers.get("www-authenticate"), null);
 });
 
+test("non-ASCII reimbursement usernames are safely encoded in verification headers", async (t) => {
+  const fixture = await startFixture({
+    config: testConfig({
+      WECHATY_REIMBURSEMENT_ACCOUNTS_JSON: JSON.stringify([
+        {
+          accountId: "partner-cn-001",
+          username: "合伙人甲",
+          password: "partner-password",
+          role: "partner",
+        },
+      ]),
+    }),
+  });
+  t.after(() => fixture.close());
+  const response = await login(fixture, {
+    username: "合伙人甲",
+    password: "partner-password",
+    returnTo: "/reimbursement/submit",
+  });
+  assert.equal(response.status, 303);
+  const reimbursement = await verify(fixture, {
+    cookie: cookieFrom(response, "admin_session"),
+    scope: "reimbursement",
+  });
+  assert.equal(reimbursement.status, 204);
+  assert.equal(reimbursement.headers.get("x-admin-username"), encodeURIComponent("合伙人甲"));
+  assert.equal(
+    reimbursement.headers.get("x-admin-authorization"),
+    `Basic ${Buffer.from("合伙人甲:partner-password").toString("base64")}`,
+  );
+});
+
 test("legacy reimbursement guest credentials are ignored", async (t) => {
   const fixture = await startFixture({
     config: testConfig({

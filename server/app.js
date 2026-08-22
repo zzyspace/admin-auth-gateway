@@ -227,7 +227,7 @@ export function createApp({ config, database, now = Date.now }) {
       resolved.account.username,
       resolved.account.password,
     ));
-    response.set("X-Admin-Username", resolved.account.username);
+    response.set("X-Admin-Username", encodeURIComponent(resolved.account.username));
     response.set("X-Admin-Role", resolved.account.role);
     response.set("X-Admin-Account-Id", resolved.account.accountId);
     response.set("X-Admin-Manager-Stores", resolved.account.managerStores.join(","));
