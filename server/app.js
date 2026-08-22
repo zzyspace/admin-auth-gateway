@@ -188,8 +188,10 @@ export function createApp({ config, database, now = Date.now }) {
       const resolved = sessions.resolve(token, scope);
       if (resolved) {
         scopes[scope] = {
+          accountId: resolved.account.accountId,
           username: resolved.account.username,
           role: resolved.account.role,
+          managerStores: resolved.account.managerStores,
         };
       }
     }
@@ -227,6 +229,8 @@ export function createApp({ config, database, now = Date.now }) {
     ));
     response.set("X-Admin-Username", resolved.account.username);
     response.set("X-Admin-Role", resolved.account.role);
+    response.set("X-Admin-Account-Id", resolved.account.accountId);
+    response.set("X-Admin-Manager-Stores", resolved.account.managerStores.join(","));
     response.sendStatus(204);
   });
 

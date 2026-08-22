@@ -15,9 +15,13 @@ export function hashToken(token) {
 }
 
 export function credentialVersion(token, scope, account) {
+  const managerStores = [...(account.managerStores ?? [])].sort().join(",");
   return crypto
     .createHmac("sha256", token)
-    .update(`${scope}\0${account.role}\0${account.username}\0${account.password}`, "utf8")
+    .update(
+      `${scope}\0${account.accountId}\0${account.role}\0${account.username}\0${account.password}\0${managerStores}`,
+      "utf8",
+    )
     .digest("hex");
 }
 

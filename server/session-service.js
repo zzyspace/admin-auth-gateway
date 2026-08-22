@@ -8,18 +8,19 @@ import {
 const SCOPES = new Set(["invoice", "reimbursement"]);
 
 function accountsFor(config) {
-  return [
-    ["invoice", config.credentials.invoice.admin],
-    ["reimbursement", config.credentials.reimbursement.admin],
-    ["reimbursement", config.credentials.reimbursement.readonly],
-  ].filter(([, account]) => account !== null);
+  return Object.entries(config.credentials).flatMap(([scope, accounts]) =>
+    accounts.map((account) => [scope, account]),
+  );
 }
 
-function currentAccountForScope(config, scope, role, username) {
-  const scopeConfig = config.credentials[scope];
-  if (!scopeConfig) return null;
-  return Object.values(scopeConfig).find(
-    (account) => account?.role === role && account.username === username,
+function currentAccountForScope(config, scope, granted) {
+  const accounts = config.credentials[scope];
+  if (!accounts || !granted?.accountId) return null;
+  return accounts.find(
+    (account) =>
+      account.accountId === granted.accountId &&
+      account.role === granted.role &&
+      account.username === granted.username,
   ) ?? null;
 }
 
@@ -46,6 +47,7 @@ export function createSessionService({ config, database, now = Date.now }) {
       const existing = scopes[scope];
       if (existing?.role === "admin") continue;
       scopes[scope] = {
+        accountId: account.accountId,
         username: account.username,
         role: account.role,
         credentialVersion: credentialVersion(token, scope, account),
@@ -77,12 +79,7 @@ export function createSessionService({ config, database, now = Date.now }) {
 
     const granted = session.scopes[requiredScope];
     if (!granted) return null;
-    const currentAccount = currentAccountForScope(
-      config,
-      requiredScope,
-      granted.role,
-      granted.username,
-    );
+    const currentAccount = currentAccountForScope(config, requiredScope, granted);
     if (!currentAccount) return null;
 
     const currentVersion = credentialVersion(token, requiredScope, currentAccount);

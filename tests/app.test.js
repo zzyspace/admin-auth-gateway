@@ -20,8 +20,21 @@ function testConfig(overrides = {}) {
     INVOICE_ADMIN_PASSWORD: "shared-password",
     WECHATY_ADMIN_USERNAME: "shared-admin",
     WECHATY_ADMIN_PASSWORD: "shared-password",
-    WECHATY_ADMIN_GUEST_USERNAME: "reimbursement-guest",
-    WECHATY_ADMIN_GUEST_PASSWORD: "guest-password",
+    WECHATY_REIMBURSEMENT_ACCOUNTS_JSON: JSON.stringify([
+      {
+        accountId: "partner-001",
+        username: "reimbursement-partner",
+        password: "partner-password",
+        role: "partner",
+      },
+      {
+        accountId: "manager-001",
+        username: "reimbursement-manager",
+        password: "manager-password",
+        role: "manager",
+        managerStores: ["fuzzyqz", "fuzzy"],
+      },
+    ]),
     ...overrides,
   });
 }
@@ -93,6 +106,39 @@ test("loadConfig requires both credential groups and safe cookie settings", () =
   assert.throws(
     () => testConfig({ ADMIN_AUTH_COOKIE_SECURE: "true", ADMIN_AUTH_COOKIE_NAME: "admin_session" }),
     /__Host-/,
+  );
+});
+
+test("loadConfig validates reimbursement roles, stable ids, and multi-store managers", () => {
+  const config = testConfig({
+    WECHATY_ADMIN_GUEST_USERNAME: "legacy-guest",
+    WECHATY_ADMIN_GUEST_PASSWORD: "legacy-password",
+  });
+  assert.deepEqual(
+    config.credentials.reimbursement.map(({ accountId, role, managerStores }) => ({
+      accountId,
+      role,
+      managerStores,
+    })),
+    [
+      { accountId: "reimbursement-admin", role: "admin", managerStores: [] },
+      { accountId: "partner-001", role: "partner", managerStores: [] },
+      { accountId: "manager-001", role: "manager", managerStores: ["fuzzy", "fuzzyqz"] },
+    ],
+  );
+  assert.throws(
+    () => testConfig({
+      WECHATY_REIMBURSEMENT_ACCOUNTS_JSON: JSON.stringify([
+        {
+          accountId: "manager-bad",
+          username: "manager-bad",
+          password: "password",
+          role: "manager",
+          managerStores: [],
+        },
+      ]),
+    }),
+    /requires at least one manager store/,
   );
 });
 
@@ -189,12 +235,12 @@ test("shared admin login grants invoice and reimbursement scopes", async (t) => 
   assert.equal(reimbursement.headers.get("x-admin-role"), "admin");
 });
 
-test("reimbursement guest cannot obtain invoice scope", async (t) => {
+test("reimbursement partner cannot obtain invoice scope", async (t) => {
   const fixture = await startFixture();
   t.after(() => fixture.close());
   const response = await login(fixture, {
-    username: "reimbursement-guest",
-    password: "guest-password",
+    username: "reimbursement-partner",
+    password: "partner-password",
     returnTo: "/reimbursement",
   });
   assert.equal(response.status, 303);
@@ -202,28 +248,48 @@ test("reimbursement guest cannot obtain invoice scope", async (t) => {
 
   const reimbursement = await verify(fixture, { cookie, scope: "reimbursement" });
   assert.equal(reimbursement.status, 204);
-  assert.equal(reimbursement.headers.get("x-admin-role"), "readonly");
+  assert.equal(reimbursement.headers.get("x-admin-role"), "partner");
+  assert.equal(reimbursement.headers.get("x-admin-account-id"), "partner-001");
 
   const invoice = await verify(fixture, { cookie, scope: "invoice" });
   assert.equal(invoice.status, 401);
   assert.equal(invoice.headers.get("www-authenticate"), null);
 });
 
-test("reimbursement guest can log in from a batch reimbursement destination", async (t) => {
+test("legacy reimbursement guest credentials are ignored", async (t) => {
+  const fixture = await startFixture({
+    config: testConfig({
+      WECHATY_ADMIN_GUEST_USERNAME: "legacy-guest",
+      WECHATY_ADMIN_GUEST_PASSWORD: "legacy-password",
+    }),
+  });
+  t.after(() => fixture.close());
+  const response = await login(fixture, {
+    username: "legacy-guest",
+    password: "legacy-password",
+    returnTo: "/reimbursement",
+  });
+  assert.equal(response.status, 401);
+  assert.equal(cookieFrom(response, "admin_session"), null);
+});
+
+test("multi-store reimbursement manager can log in from the unified submission page", async (t) => {
   const fixture = await startFixture();
   t.after(() => fixture.close());
   const response = await login(fixture, {
-    username: "reimbursement-guest",
-    password: "guest-password",
-    returnTo: "/reimbursement/submit_fuzzyqz",
+    username: "reimbursement-manager",
+    password: "manager-password",
+    returnTo: "/reimbursement/submit",
   });
   assert.equal(response.status, 303);
-  assert.equal(response.headers.get("location"), "/reimbursement/submit_fuzzyqz");
+  assert.equal(response.headers.get("location"), "/reimbursement/submit");
   const cookie = cookieFrom(response, "admin_session");
 
   const reimbursement = await verify(fixture, { cookie, scope: "reimbursement" });
   assert.equal(reimbursement.status, 204);
-  assert.equal(reimbursement.headers.get("x-admin-role"), "readonly");
+  assert.equal(reimbursement.headers.get("x-admin-role"), "manager");
+  assert.equal(reimbursement.headers.get("x-admin-account-id"), "manager-001");
+  assert.equal(reimbursement.headers.get("x-admin-manager-stores"), "fuzzy,fuzzyqz");
   assert.equal((await verify(fixture, { cookie, scope: "invoice" })).status, 401);
 });
 
@@ -267,7 +333,7 @@ test("expired sessions and sessions created under changed credentials are reject
     returnTo: "/invoice",
   });
   const firstCookie = cookieFrom(first, "admin_session");
-  config.credentials.invoice.admin.password = "new-password";
+  config.credentials.invoice[0].password = "new-password";
   assert.equal((await verify(fixture, { cookie: firstCookie, scope: "invoice" })).status, 401);
   assert.equal((await verify(fixture, { cookie: firstCookie, scope: "reimbursement" })).status, 204);
 
@@ -279,6 +345,21 @@ test("expired sessions and sessions created under changed credentials are reject
   const secondCookie = cookieFrom(second, "admin_session");
   clock.value += 301_000;
   assert.equal((await verify(fixture, { cookie: secondCookie, scope: "invoice" })).status, 401);
+});
+
+test("manager sessions are invalidated when assigned stores change", async (t) => {
+  const config = testConfig();
+  const fixture = await startFixture({ config });
+  t.after(() => fixture.close());
+  const response = await login(fixture, {
+    username: "reimbursement-manager",
+    password: "manager-password",
+    returnTo: "/reimbursement/submit",
+  });
+  const cookie = cookieFrom(response, "admin_session");
+  assert.equal((await verify(fixture, { cookie, scope: "reimbursement" })).status, 204);
+  config.credentials.reimbursement.find((account) => account.accountId === "manager-001").managerStores = ["peanut"];
+  assert.equal((await verify(fixture, { cookie, scope: "reimbursement" })).status, 401);
 });
 
 test("logout destroys the server-side session", async (t) => {

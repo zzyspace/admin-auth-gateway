@@ -18,12 +18,14 @@ The gateway does not own or duplicate passwords. It reads the existing
   receives both `invoice` and `reimbursement` scopes.
 - The invoice scope covers invoice-submit and employee-information because they
   already share `INVOICE_ADMIN_USERNAME` and `INVOICE_ADMIN_PASSWORD`.
-- The reimbursement guest receives only a `readonly` reimbursement scope.
+- Reimbursement accounts use `admin`, `partner`, or `manager` roles. Managers
+  can be assigned one or more stores through `managerStores`.
 - Nginx validates the Cookie using `auth_request`, then injects Basic Auth only
   on the loopback request to the existing application. Existing application
   authorization remains a second layer.
 - Credential fingerprints are keyed by the random session token. Changing a
-  configured username, password, or role invalidates sessions for that scope.
+  configured account id, username, password, role, or manager-store assignment
+  invalidates sessions for that scope.
 - Session tokens are hashed in SQLite. Passwords and Basic headers are never
   stored in the session database or browser storage.
 
@@ -55,6 +57,7 @@ export INVOICE_ADMIN_USERNAME=admin
 export INVOICE_ADMIN_PASSWORD=invoice-password
 export WECHATY_ADMIN_USERNAME=admin
 export WECHATY_ADMIN_PASSWORD=reimbursement-password
+export WECHATY_REIMBURSEMENT_ACCOUNTS_JSON='[{"accountId":"partner-001","username":"partner","password":"partner-password","role":"partner"},{"accountId":"manager-001","username":"manager","password":"manager-password","role":"manager","managerStores":["fuzzy","fuzzyqz"]}]'
 npm install
 npm run dev
 ```
@@ -107,8 +110,8 @@ After changing `/etc/invoice-submit.env`, restart:
 systemctl restart invoice-submit.service employee-information.service admin-auth-gateway.service
 ```
 
-After changing the admin credentials in `/etc/wechat-claw.env`, restart only the
-services that consume those admin values:
+After changing the admin, partner, or manager accounts in
+`/etc/wechat-claw.env`, restart only the services that consume those values:
 
 ```bash
 systemctl restart wechat-claw-reimbursement-admin.service admin-auth-gateway.service

@@ -1,6 +1,8 @@
 import path from "node:path";
 
 const DEFAULT_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+const REIMBURSEMENT_ACCOUNT_ROLES = new Set(["partner", "manager"]);
+const REIMBURSEMENT_MANAGER_STORES = new Set(["fuzzy", "peanut", "fuzzyqz"]);
 
 function optionalTrimmed(value) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
@@ -29,7 +31,7 @@ function parseBoolean(value, fallback, name) {
   throw new Error(`${name} must be true or false.`);
 }
 
-function configuredAccount({ username, password, role, label, trim = false }) {
+function configuredAccount({ accountId, username, password, role, label, managerStores = [], trim = false }) {
   const normalizedUsername = typeof username === "string"
     ? (trim ? username.trim() : username)
     : undefined;
@@ -46,14 +48,87 @@ function configuredAccount({ username, password, role, label, trim = false }) {
   }
 
   return {
+    accountId,
     username: normalizedUsername,
     password: normalizedPassword,
     role,
+    managerStores,
   };
+}
+
+function parseReimbursementAccounts(value) {
+  const raw = optionalTrimmed(value);
+  if (!raw) return [];
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(`WECHATY_REIMBURSEMENT_ACCOUNTS_JSON must be valid JSON: ${error.message}`);
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error("WECHATY_REIMBURSEMENT_ACCOUNTS_JSON must be a JSON array.");
+  }
+
+  const accounts = parsed.map((item, index) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      throw new Error(`Reimbursement account ${index + 1} must be an object.`);
+    }
+    const accountId = optionalTrimmed(item.accountId);
+    const username = optionalTrimmed(item.username);
+    const password = optionalTrimmed(item.password);
+    const role = optionalTrimmed(item.role);
+    if (!accountId || !username || !password || !role) {
+      throw new Error(`Reimbursement account ${index + 1} requires accountId, username, password, and role.`);
+    }
+    if (!REIMBURSEMENT_ACCOUNT_ROLES.has(role)) {
+      throw new Error(`Reimbursement account ${accountId} has unsupported role: ${role}.`);
+    }
+
+    const rawStores = item.managerStores ?? [];
+    if (!Array.isArray(rawStores)) {
+      throw new Error(`Reimbursement account ${accountId} managerStores must be an array.`);
+    }
+    const managerStores = [...new Set(rawStores.map((store) => optionalTrimmed(store)))];
+    if (managerStores.some((store) => !store || !REIMBURSEMENT_MANAGER_STORES.has(store))) {
+      throw new Error(`Reimbursement account ${accountId} has an unsupported manager store.`);
+    }
+    if (role === "manager" && managerStores.length === 0) {
+      throw new Error(`Reimbursement manager account ${accountId} requires at least one manager store.`);
+    }
+    if (role !== "manager" && managerStores.length > 0) {
+      throw new Error(`Reimbursement partner account ${accountId} cannot configure managerStores.`);
+    }
+
+    return configuredAccount({
+      accountId,
+      username,
+      password,
+      role,
+      label: `Reimbursement account ${accountId}`,
+      managerStores: managerStores.sort(),
+      trim: true,
+    });
+  });
+
+  const accountIds = new Set();
+  const usernames = new Set();
+  for (const account of accounts) {
+    if (accountIds.has(account.accountId)) {
+      throw new Error(`Duplicate reimbursement accountId: ${account.accountId}.`);
+    }
+    if (usernames.has(account.username)) {
+      throw new Error(`Duplicate reimbursement username: ${account.username}.`);
+    }
+    accountIds.add(account.accountId);
+    usernames.add(account.username);
+  }
+  return accounts;
 }
 
 export function loadConfig(env = process.env) {
   const invoiceAdmin = configuredAccount({
+    accountId: "invoice-admin",
     username: env.INVOICE_ADMIN_USERNAME,
     password: env.INVOICE_ADMIN_PASSWORD,
     role: "admin",
@@ -61,19 +136,16 @@ export function loadConfig(env = process.env) {
     trim: false,
   });
   const reimbursementAdmin = configuredAccount({
+    accountId: "reimbursement-admin",
     username: env.WECHATY_ADMIN_USERNAME,
     password: env.WECHATY_ADMIN_PASSWORD,
     role: "admin",
     label: "Reimbursement admin",
     trim: true,
   });
-  const reimbursementGuest = configuredAccount({
-    username: env.WECHATY_ADMIN_GUEST_USERNAME,
-    password: env.WECHATY_ADMIN_GUEST_PASSWORD,
-    role: "readonly",
-    label: "Reimbursement guest",
-    trim: true,
-  });
+  const reimbursementAccounts = parseReimbursementAccounts(
+    env.WECHATY_REIMBURSEMENT_ACCOUNTS_JSON,
+  );
 
   if (!invoiceAdmin) {
     throw new Error("INVOICE_ADMIN_USERNAME and INVOICE_ADMIN_PASSWORD are required.");
@@ -81,8 +153,11 @@ export function loadConfig(env = process.env) {
   if (!reimbursementAdmin) {
     throw new Error("WECHATY_ADMIN_USERNAME and WECHATY_ADMIN_PASSWORD are required.");
   }
-  if (reimbursementGuest?.username === reimbursementAdmin.username) {
-    throw new Error("Reimbursement guest username must differ from the admin username.");
+  if (reimbursementAccounts.some((account) => account.username === reimbursementAdmin.username)) {
+    throw new Error("Reimbursement account usernames must differ from WECHATY_ADMIN_USERNAME.");
+  }
+  if (reimbursementAccounts.some((account) => account.accountId === reimbursementAdmin.accountId)) {
+    throw new Error(`Duplicate reimbursement accountId: ${reimbursementAdmin.accountId}.`);
   }
 
   const cookieSecure = parseBoolean(
@@ -130,13 +205,8 @@ export function loadConfig(env = process.env) {
       }),
     },
     credentials: {
-      invoice: {
-        admin: invoiceAdmin,
-      },
-      reimbursement: {
-        admin: reimbursementAdmin,
-        readonly: reimbursementGuest,
-      },
+      invoice: [invoiceAdmin],
+      reimbursement: [reimbursementAdmin, ...reimbursementAccounts],
     },
   };
 }
