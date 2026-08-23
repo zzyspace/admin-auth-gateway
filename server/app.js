@@ -34,22 +34,22 @@ function sessionCookieClearOptions(config) {
   };
 }
 
-function csrfCookieOptions(config) {
+function csrfCookieOptions(config, path = "/login") {
   return {
     httpOnly: true,
     secure: config.cookie.secure,
     sameSite: "strict",
-    path: "/admin-login",
+    path,
     maxAge: 10 * 60 * 1000,
   };
 }
 
-function csrfCookieClearOptions(config) {
+function csrfCookieClearOptions(config, path = "/login") {
   return {
     httpOnly: true,
     secure: config.cookie.secure,
     sameSite: "strict",
-    path: "/admin-login",
+    path,
   };
 }
 
@@ -91,11 +91,12 @@ export function createApp({ config, database, now = Date.now }) {
   app.set("trust proxy", "loopback");
   app.use(noStore);
 
-  app.get("/healthz", (_request, response) => {
+  app.get(["/health/auth", "/healthz"], (_request, response) => {
     response.status(200).json({ ok: true });
   });
 
-  app.get("/admin-login", (request, response) => {
+  app.get(["/login", "/admin-login"], (request, response) => {
+    const loginPath = request.path === "/admin-login" ? "/admin-login" : "/login";
     const returnTo = sanitizeReturnTo(request.query.returnTo);
     const existing = sessions.resolve(
       requestSessionToken(request, config),
@@ -107,14 +108,20 @@ export function createApp({ config, database, now = Date.now }) {
     }
 
     const csrfToken = randomToken();
-    response.cookie(LOGIN_CSRF_COOKIE, csrfToken, csrfCookieOptions(config));
-    response.status(200).type("html").send(renderLoginPage({ csrfToken, returnTo, sessionDays }));
+    response.cookie(LOGIN_CSRF_COOKIE, csrfToken, csrfCookieOptions(config, loginPath));
+    response.status(200).type("html").send(renderLoginPage({
+      csrfToken,
+      returnTo,
+      sessionDays,
+      actionPath: loginPath,
+    }));
   });
 
   app.post(
-    "/admin-login",
+    ["/login", "/admin-login"],
     express.urlencoded({ extended: false, limit: "8kb" }),
     (request, response) => {
+      const loginPath = request.path === "/admin-login" ? "/admin-login" : "/login";
       const returnTo = sanitizeReturnTo(request.body.returnTo);
       const requiredScope = scopeForReturnTo(returnTo);
       const cookies = parseCookies(request.headers.cookie);
@@ -126,16 +133,17 @@ export function createApp({ config, database, now = Date.now }) {
         return;
       }
 
-      response.clearCookie(LOGIN_CSRF_COOKIE, csrfCookieClearOptions(config));
+      response.clearCookie(LOGIN_CSRF_COOKIE, csrfCookieClearOptions(config, loginPath));
       const rateLimitKey = request.ip || request.socket.remoteAddress || "unknown";
       if (limiter.isLimited(rateLimitKey)) {
         const csrfToken = randomToken();
-        response.cookie(LOGIN_CSRF_COOKIE, csrfToken, csrfCookieOptions(config));
+        response.cookie(LOGIN_CSRF_COOKIE, csrfToken, csrfCookieOptions(config, loginPath));
         response.set("Retry-After", String(config.loginRateLimit.windowSeconds));
         response.status(429).type("html").send(renderLoginPage({
           csrfToken,
           returnTo,
           sessionDays,
+          actionPath: loginPath,
           error: "登录尝试次数过多，请稍后再试。",
         }));
         return;
@@ -148,11 +156,12 @@ export function createApp({ config, database, now = Date.now }) {
       if (!matches.some(({ scope }) => scope === requiredScope)) {
         limiter.recordFailure(rateLimitKey);
         const csrfToken = randomToken();
-        response.cookie(LOGIN_CSRF_COOKIE, csrfToken, csrfCookieOptions(config));
+        response.cookie(LOGIN_CSRF_COOKIE, csrfToken, csrfCookieOptions(config, loginPath));
         response.status(401).type("html").send(renderLoginPage({
           csrfToken,
           returnTo,
           sessionDays,
+          actionPath: loginPath,
           error: "账号或密码不正确。",
         }));
         return;
@@ -167,9 +176,10 @@ export function createApp({ config, database, now = Date.now }) {
   );
 
   app.post(
-    "/admin-logout",
+    ["/logout", "/admin-logout"],
     express.urlencoded({ extended: false, limit: "2kb" }),
     (request, response) => {
+      const loginPath = request.path === "/admin-logout" ? "/admin-login" : "/login";
       if (!sameOriginMutation(request)) {
         response.status(403).type("text/plain").send("退出请求来源无效。");
         return;
@@ -177,11 +187,11 @@ export function createApp({ config, database, now = Date.now }) {
       const returnTo = sanitizeReturnTo(request.body.returnTo);
       sessions.destroy(requestSessionToken(request, config));
       response.clearCookie(config.cookie.name, sessionCookieClearOptions(config));
-      response.redirect(303, `/admin-login?returnTo=${encodeURIComponent(returnTo)}`);
+      response.redirect(303, `${loginPath}?returnTo=${encodeURIComponent(returnTo)}`);
     },
   );
 
-  app.get("/admin-auth/api/session", (request, response) => {
+  app.get(["/auth/api/session", "/admin-auth/api/session"], (request, response) => {
     const token = requestSessionToken(request, config);
     const scopes = {};
     for (const scope of INTERNAL_SCOPES) {
@@ -202,7 +212,7 @@ export function createApp({ config, database, now = Date.now }) {
     response.status(200).json({ success: true, scopes });
   });
 
-  app.all("/admin-auth/api/unauthorized", (_request, response) => {
+  app.all(["/auth/api/unauthorized", "/admin-auth/api/unauthorized"], (_request, response) => {
     response.status(401).json({ success: false, error: { message: "需要登录。" } });
   });
 

@@ -3,9 +3,9 @@
 Shared login and persistent server-side sessions for these existing admin
 applications:
 
-- invoice-submit: `/invoice` and `/api/admin/`
-- employee-information: `/employee/portal` and `/employee/api/admin/`
-- wechat-claw reimbursement admin: `/reimbursement` and `/reimbursement/api/`
+- invoice-submit: `/invoice` and `/invoice/api/admin/`
+- employee-information: `/staff` and `/staff/api/admin/`
+- wechat-claw reimbursement admin: `/expense` and `/expense/api/`
 
 The gateway does not own or duplicate passwords. It reads the existing
 `INVOICE_ADMIN_*` credentials from `/etc/invoice-submit.env` and the existing
@@ -62,7 +62,7 @@ npm install
 npm run dev
 ```
 
-Then open `http://127.0.0.1:8790/admin-login?returnTo=/invoice`.
+Then open `http://127.0.0.1:8790/login?returnTo=/invoice`.
 
 ## Test
 

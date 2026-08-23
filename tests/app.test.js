@@ -69,14 +69,14 @@ function csrfFrom(html) {
 }
 
 async function login(fixture, { username, password, returnTo }) {
-  const page = await fetch(`${fixture.baseUrl}/admin-login?returnTo=${encodeURIComponent(returnTo)}`);
+  const page = await fetch(`${fixture.baseUrl}/login?returnTo=${encodeURIComponent(returnTo)}`);
   const html = await page.text();
   const csrfToken = csrfFrom(html);
   const csrfCookie = cookieFrom(page, "admin_login_csrf");
   assert.ok(csrfToken);
   assert.ok(csrfCookie);
 
-  const response = await fetch(`${fixture.baseUrl}/admin-login`, {
+  const response = await fetch(`${fixture.baseUrl}/login`, {
     method: "POST",
     redirect: "manual",
     headers: {
@@ -145,7 +145,7 @@ test("loadConfig validates reimbursement roles, stable ids, and multi-store mana
 test("login page sanitizes external return destinations and sets CSRF cookie", async (t) => {
   const fixture = await startFixture();
   t.after(() => fixture.close());
-  const response = await fetch(`${fixture.baseUrl}/admin-login?returnTo=https://evil.example/`);
+  const response = await fetch(`${fixture.baseUrl}/login?returnTo=https://evil.example/`);
   const html = await response.text();
   assert.equal(response.status, 200);
   assert.match(html, /name="returnTo" value="\/invoice"/);
@@ -155,27 +155,39 @@ test("login page sanitizes external return destinations and sets CSRF cookie", a
   assert.equal(response.headers.get("x-frame-options"), "DENY");
 
   const nearMissResponse = await fetch(
-    `${fixture.baseUrl}/admin-login?returnTo=${encodeURIComponent("/reimbursement/submit_other")}`,
+    `${fixture.baseUrl}/login?returnTo=${encodeURIComponent("/expense/submit_other")}`,
   );
   assert.match(await nearMissResponse.text(), /name="returnTo" value="\/invoice"/);
 });
 
-test("login page preserves exact batch reimbursement destinations", async (t) => {
+test("login page preserves exact admin destinations", async (t) => {
   const fixture = await startFixture();
   t.after(() => fixture.close());
 
   for (const returnTo of [
-    "/reimbursement/submit",
-    "/reimbursement/submit_fuzzy",
-    "/reimbursement/submit_peanut",
-    "/reimbursement/submit_fuzzyqz",
+    "/invoice",
+    "/staff",
+    "/expense",
+    "/expense/submit",
   ]) {
     const response = await fetch(
-      `${fixture.baseUrl}/admin-login?returnTo=${encodeURIComponent(returnTo)}`,
+      `${fixture.baseUrl}/login?returnTo=${encodeURIComponent(returnTo)}`,
     );
     assert.equal(response.status, 200);
     assert.match(await response.text(), new RegExp(`name="returnTo" value="${returnTo}"`));
   }
+});
+
+test("legacy login route remains self-contained during migration", async (t) => {
+  const fixture = await startFixture();
+  t.after(() => fixture.close());
+
+  const response = await fetch(
+    `${fixture.baseUrl}/admin-login?returnTo=${encodeURIComponent("/employee/portal")}`,
+  );
+  assert.equal(response.status, 200);
+  assert.match(await response.text(), /form method="post" action="\/admin-login"/);
+  assert.match(response.headers.get("set-cookie"), /Path=\/admin-login/i);
 });
 
 test("production configuration emits a host-wide Secure session cookie", async (t) => {
@@ -201,7 +213,7 @@ test("production configuration emits a host-wide Secure session cookie", async (
 test("login rejects missing CSRF token", async (t) => {
   const fixture = await startFixture();
   t.after(() => fixture.close());
-  const response = await fetch(`${fixture.baseUrl}/admin-login`, {
+  const response = await fetch(`${fixture.baseUrl}/login`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ username: "shared-admin", password: "shared-password" }),
@@ -215,10 +227,10 @@ test("shared admin login grants invoice and reimbursement scopes", async (t) => 
   const response = await login(fixture, {
     username: "shared-admin",
     password: "shared-password",
-    returnTo: "/reimbursement",
+    returnTo: "/expense",
   });
   assert.equal(response.status, 303);
-  assert.equal(response.headers.get("location"), "/reimbursement");
+  assert.equal(response.headers.get("location"), "/expense");
   assert.match(response.headers.get("set-cookie"), /admin_session=.*Max-Age=3600.*HttpOnly.*SameSite=Lax/i);
   const cookie = cookieFrom(response, "admin_session");
 
@@ -241,7 +253,7 @@ test("reimbursement partner cannot obtain invoice scope", async (t) => {
   const response = await login(fixture, {
     username: "reimbursement-partner",
     password: "partner-password",
-    returnTo: "/reimbursement",
+    returnTo: "/expense",
   });
   assert.equal(response.status, 303);
   const cookie = cookieFrom(response, "admin_session");
@@ -273,7 +285,7 @@ test("non-ASCII reimbursement usernames are safely encoded in verification heade
   const response = await login(fixture, {
     username: "合伙人甲",
     password: "partner-password",
-    returnTo: "/reimbursement/submit",
+    returnTo: "/expense/submit",
   });
   assert.equal(response.status, 303);
   const reimbursement = await verify(fixture, {
@@ -299,7 +311,7 @@ test("legacy reimbursement guest credentials are ignored", async (t) => {
   const response = await login(fixture, {
     username: "legacy-guest",
     password: "legacy-password",
-    returnTo: "/reimbursement",
+    returnTo: "/expense",
   });
   assert.equal(response.status, 401);
   assert.equal(cookieFrom(response, "admin_session"), null);
@@ -311,10 +323,10 @@ test("multi-store reimbursement manager can log in from the unified submission p
   const response = await login(fixture, {
     username: "reimbursement-manager",
     password: "manager-password",
-    returnTo: "/reimbursement/submit",
+    returnTo: "/expense/submit",
   });
   assert.equal(response.status, 303);
-  assert.equal(response.headers.get("location"), "/reimbursement/submit");
+  assert.equal(response.headers.get("location"), "/expense/submit");
   const cookie = cookieFrom(response, "admin_session");
 
   const reimbursement = await verify(fixture, { cookie, scope: "reimbursement" });
@@ -333,7 +345,7 @@ test("credentials for the wrong destination do not create a session", async (t) 
   const response = await login(fixture, {
     username: "shared-admin",
     password: "shared-password",
-    returnTo: "/reimbursement",
+    returnTo: "/expense",
   });
   assert.equal(response.status, 401);
   assert.equal(cookieFrom(response, "admin_session"), null);
@@ -386,7 +398,7 @@ test("manager sessions are invalidated when assigned stores change", async (t) =
   const response = await login(fixture, {
     username: "reimbursement-manager",
     password: "manager-password",
-    returnTo: "/reimbursement/submit",
+    returnTo: "/expense/submit",
   });
   const cookie = cookieFrom(response, "admin_session");
   assert.equal((await verify(fixture, { cookie, scope: "reimbursement" })).status, 204);
@@ -403,7 +415,7 @@ test("logout destroys the server-side session", async (t) => {
     returnTo: "/invoice",
   });
   const cookie = cookieFrom(loginResponse, "admin_session");
-  const logout = await fetch(`${fixture.baseUrl}/admin-logout`, {
+  const logout = await fetch(`${fixture.baseUrl}/logout`, {
     method: "POST",
     redirect: "manual",
     headers: {
@@ -411,10 +423,10 @@ test("logout destroys the server-side session", async (t) => {
       Origin: fixture.baseUrl,
       "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: new URLSearchParams({ returnTo: "/reimbursement" }),
+    body: new URLSearchParams({ returnTo: "/expense" }),
   });
   assert.equal(logout.status, 303);
-  assert.equal(logout.headers.get("location"), "/admin-login?returnTo=%2Freimbursement");
+  assert.equal(logout.headers.get("location"), "/login?returnTo=%2Fexpense");
   assert.equal((await verify(fixture, { cookie, scope: "invoice" })).status, 401);
 });
 

@@ -8,7 +8,7 @@ MODE="${2:-production}"
 APP_DIR="/opt/admin-auth-gateway/current"
 SERVICE_NAME="admin-auth-gateway.service"
 SYSTEMD_UNIT_DIR="/etc/systemd/system"
-HEALTHZ_URL="http://127.0.0.1:8790/healthz"
+HEALTHZ_URL="http://127.0.0.1:8790/health/auth"
 
 SSH_OPTS=(
   -o BatchMode=yes

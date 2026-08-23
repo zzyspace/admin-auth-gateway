@@ -1,11 +1,11 @@
 const ALLOWED_RETURN_PATHS = [
   /^\/invoice\/?$/,
+  /^\/staff\/?$/,
+  /^\/expense\/?$/,
+  /^\/expense\/submit\/?$/,
   /^\/employee\/portal\/?$/,
   /^\/reimbursement\/?$/,
   /^\/reimbursement\/submit\/?$/,
-  /^\/reimbursement\/submit_fuzzy\/?$/,
-  /^\/reimbursement\/submit_peanut\/?$/,
-  /^\/reimbursement\/submit_fuzzyqz\/?$/,
 ];
 
 export function sanitizeReturnTo(value) {
@@ -16,7 +16,9 @@ export function sanitizeReturnTo(value) {
 }
 
 export function scopeForReturnTo(returnTo) {
-  return returnTo.startsWith("/reimbursement") ? "reimbursement" : "invoice";
+  return returnTo.startsWith("/expense") || returnTo.startsWith("/reimbursement")
+    ? "reimbursement"
+    : "invoice";
 }
 
 function escapeHtml(value) {
@@ -28,11 +30,11 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-export function renderLoginPage({ csrfToken, returnTo, sessionDays, error = "" }) {
+export function renderLoginPage({ csrfToken, returnTo, sessionDays, error = "", actionPath = "/login" }) {
   const safeReturnTo = sanitizeReturnTo(returnTo);
-  const destination = safeReturnTo.startsWith("/reimbursement")
+  const destination = safeReturnTo.startsWith("/expense") || safeReturnTo.startsWith("/reimbursement")
     ? "报账后台"
-    : safeReturnTo.startsWith("/employee")
+    : safeReturnTo.startsWith("/staff") || safeReturnTo.startsWith("/employee")
       ? "员工资料后台"
       : "开票后台";
 
@@ -70,7 +72,7 @@ export function renderLoginPage({ csrfToken, returnTo, sessionDays, error = "" }
       <h1>后台登录</h1>
       <p>登录后进入${escapeHtml(destination)}</p>
       ${error ? `<div class="error" role="alert">${escapeHtml(error)}</div>` : ""}
-      <form method="post" action="/admin-login" autocomplete="on">
+      <form method="post" action="${escapeHtml(actionPath)}" autocomplete="on">
         <input type="hidden" name="csrfToken" value="${escapeHtml(csrfToken)}">
         <input type="hidden" name="returnTo" value="${escapeHtml(safeReturnTo)}">
         <label for="username">账号</label>
