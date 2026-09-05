@@ -17,6 +17,9 @@ Environment=ADMIN_AUTH_COOKIE_SECURE=true
 Environment=ADMIN_AUTH_SESSION_TTL_SECONDS=2592000
 # Optional temporary overrides, for example the reversible HTTP trial file.
 EnvironmentFile=-/etc/admin-auth-gateway.env
+# Shared transport secret and per-application migration mode.
+EnvironmentFile=-/etc/admin-auth-internal.env
+EnvironmentFile=-/etc/admin-auth-gateway-mode.env
 ExecStart=/usr/bin/node server/index.js
 Restart=on-failure
 RestartSec=3

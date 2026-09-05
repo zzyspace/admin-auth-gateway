@@ -1,10 +1,17 @@
+import fs from "node:fs";
+import path from "node:path";
+import { createAccountStore } from "./account-store.js";
 import { loadConfig } from "./config.js";
 import { createSessionDatabase } from "./database.js";
 import { createApp } from "./app.js";
 
 const config = loadConfig();
+if (config.authMode === "unified" && !fs.existsSync(path.join(config.stateDir, "accounts.db"))) {
+  throw new Error("Import unified accounts before enabling unified mode.");
+}
+const accounts = config.authMode === "unified" ? createAccountStore({ stateDir: config.stateDir }) : undefined;
 const database = createSessionDatabase({ stateDir: config.stateDir });
-const { app, sessions } = createApp({ config, database });
+const { app, sessions } = createApp({ config, database, accounts });
 
 sessions.cleanup();
 const cleanupTimer = setInterval(() => sessions.cleanup(), 60 * 60 * 1000);
@@ -19,6 +26,7 @@ function shutdown(signal) {
   server.close(() => {
     clearInterval(cleanupTimer);
     database.close();
+    accounts?.close();
     process.exit(0);
   });
 }

@@ -127,30 +127,38 @@ function parseReimbursementAccounts(value) {
 }
 
 export function loadConfig(env = process.env) {
+  const authMode = env.ADMIN_AUTH_MODE ?? "legacy";
+  if (!["legacy", "unified"].includes(authMode)) throw new Error("Invalid ADMIN_AUTH_MODE.");
+  const host = optionalTrimmed(env.ADMIN_AUTH_HOST) ?? "127.0.0.1";
+  const internalToken = env.ADMIN_AUTH_INTERNAL_TOKEN ?? "";
+  if (authMode === "unified" && (!/^[A-Za-z0-9_-]{32,256}$/.test(internalToken) || !["127.0.0.1", "::1"].includes(host))) {
+    throw new Error("Unified mode requires a loopback host and a 32-256 character internal token.");
+  }
+  const legacyEnv = authMode === "legacy" ? env : {};
   const invoiceAdmin = configuredAccount({
     accountId: "invoice-admin",
-    username: env.INVOICE_ADMIN_USERNAME,
-    password: env.INVOICE_ADMIN_PASSWORD,
+    username: legacyEnv.INVOICE_ADMIN_USERNAME,
+    password: legacyEnv.INVOICE_ADMIN_PASSWORD,
     role: "admin",
     label: "Invoice admin",
     trim: false,
   });
   const reimbursementAdmin = configuredAccount({
     accountId: "reimbursement-admin",
-    username: env.WECHATY_ADMIN_USERNAME,
-    password: env.WECHATY_ADMIN_PASSWORD,
+    username: legacyEnv.WECHATY_ADMIN_USERNAME,
+    password: legacyEnv.WECHATY_ADMIN_PASSWORD,
     role: "admin",
     label: "Reimbursement admin",
     trim: true,
   });
   const reimbursementAccounts = parseReimbursementAccounts(
-    env.WECHATY_REIMBURSEMENT_ACCOUNTS_JSON,
+    legacyEnv.WECHATY_REIMBURSEMENT_ACCOUNTS_JSON,
   );
 
-  if (!invoiceAdmin) {
+  if (authMode === "legacy" && !invoiceAdmin) {
     throw new Error("INVOICE_ADMIN_USERNAME and INVOICE_ADMIN_PASSWORD are required.");
   }
-  if (!reimbursementAdmin) {
+  if (authMode === "legacy" && !reimbursementAdmin) {
     throw new Error("WECHATY_ADMIN_USERNAME and WECHATY_ADMIN_PASSWORD are required.");
   }
   if (reimbursementAccounts.some((account) => account.username === reimbursementAdmin.username)) {
@@ -176,7 +184,10 @@ export function loadConfig(env = process.env) {
   }
 
   return {
-    host: optionalTrimmed(env.ADMIN_AUTH_HOST) ?? "127.0.0.1",
+    host,
+    authMode,
+    managementAccountIds: (env.ADMIN_AUTH_MANAGEMENT_ACCOUNT_IDS ?? "").split(",").map((id) => id.trim()).filter(Boolean),
+    internalToken,
     port: parseInteger(env.ADMIN_AUTH_PORT, 8790, {
       min: 1,
       max: 65535,
@@ -205,8 +216,8 @@ export function loadConfig(env = process.env) {
       }),
     },
     credentials: {
-      invoice: [invoiceAdmin],
-      reimbursement: [reimbursementAdmin, ...reimbursementAccounts],
+      invoice: invoiceAdmin ? [invoiceAdmin] : [],
+      reimbursement: [reimbursementAdmin, ...reimbursementAccounts].filter(Boolean),
     },
   };
 }

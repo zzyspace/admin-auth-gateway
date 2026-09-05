@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import { createAccountStore } from "../server/account-store.js";
 import { createApp } from "../server/app.js";
 import { loadConfig } from "../server/config.js";
 import { createSessionDatabase } from "../server/database.js";
@@ -39,10 +40,12 @@ function testConfig(overrides = {}) {
   });
 }
 
-async function startFixture({ config = testConfig(), clock } = {}) {
+async function startFixture({ config = testConfig(), clock, records } = {}) {
   const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "admin-auth-gateway-test-"));
   const database = createSessionDatabase({ stateDir });
-  const { app } = createApp({ config, database, now: clock ? () => clock.value : Date.now });
+  const accounts = records ? createAccountStore({ stateDir }) : undefined;
+  if (records) accounts.importAccounts(records, { actor: "test" });
+  const { app } = createApp({ config, database, accounts, now: clock ? () => clock.value : Date.now });
   const server = await new Promise((resolve) => {
     const listening = app.listen(0, "127.0.0.1", () => resolve(listening));
   });
@@ -50,9 +53,11 @@ async function startFixture({ config = testConfig(), clock } = {}) {
   return {
     baseUrl: `http://127.0.0.1:${address.port}`,
     config,
+    accounts,
     async close() {
       await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
       database.close();
+      accounts?.close();
       fs.rmSync(stateDir, { recursive: true, force: true });
     },
   };
@@ -464,4 +469,62 @@ test("login failures are rate limited per client", async (t) => {
   });
   assert.equal(limited.status, 429);
   assert.equal(limited.headers.get("retry-after"), "60");
+});
+
+const internalToken = "integration-test-internal-secret-00000001";
+function unifiedConfig() {
+  return loadConfig({ ADMIN_AUTH_MODE: "unified", ADMIN_AUTH_INTERNAL_TOKEN: internalToken,
+    ADMIN_AUTH_COOKIE_SECURE: "false", ADMIN_AUTH_COOKIE_NAME: "admin_session" });
+}
+const invoiceAccess = { app: "invoice", role: "viewer", permissions: ["submission:view"],
+  config: { viewScope: { ownership: "any", stores: ["fuzzy"] } } };
+const unifiedRecords = [{ account: { accountId: "person", username: "person", password: "person-password" }, access: [invoiceAccess] }];
+
+test("unified config needs no legacy credentials and rejects unsafe transport settings", () => {
+  assert.deepEqual(unifiedConfig().credentials, { invoice: [], reimbursement: [] });
+  assert.throws(() => loadConfig({ ADMIN_AUTH_MODE: "typo" }), /ADMIN_AUTH_MODE/);
+  assert.throws(() => loadConfig({ ADMIN_AUTH_MODE: "unified", ADMIN_AUTH_INTERNAL_TOKEN: "short" }), /internal token/);
+  assert.throws(() => loadConfig({ ADMIN_AUTH_MODE: "unified", ADMIN_AUTH_INTERNAL_TOKEN: internalToken, ADMIN_AUTH_HOST: "0.0.0.0" }), /loopback/);
+});
+
+test("unified HTTP login separates staff from invoice and never forwards passwords", async (t) => {
+  const fixture = await startFixture({ config: unifiedConfig(), records: unifiedRecords });
+  t.after(() => fixture.close());
+  const denied = await login(fixture, { username: "person", password: "person-password", returnTo: "/staff" });
+  assert.equal(denied.status, 401);
+  const response = await login(fixture, { username: "person", password: "person-password", returnTo: "/invoice" });
+  assert.equal(response.status, 303);
+  const cookie = cookieFrom(response, "admin_session");
+  assert.equal((await verify(fixture, { cookie, scope: "staff" })).status, 401);
+  const verified = await verify(fixture, { cookie, scope: "invoice" });
+  assert.equal(verified.status, 204);
+  assert.equal(verified.headers.get("x-admin-authorization"), null);
+  const status = await fetch(`${fixture.baseUrl}/auth/api/session`, { headers: { Cookie: cookie } });
+  assert.deepEqual((await status.json()).apps, ["invoice"]);
+});
+
+test("internal authorization requires service secret, session and valid mutation origin", async (t) => {
+  const fixture = await startFixture({ config: unifiedConfig(), records: unifiedRecords });
+  t.after(() => fixture.close());
+  const response = await login(fixture, { username: "person", password: "person-password", returnTo: "/invoice" });
+  const cookie = cookieFrom(response, "admin_session");
+  const url = `${fixture.baseUrl}/internal/authorization/invoice`;
+  const headers = { Cookie: cookie, Authorization: `Bearer ${internalToken}` };
+  assert.equal((await fetch(url, { headers: { Cookie: cookie, "X-Admin-Account-Id": "person" } })).status, 403);
+  assert.equal((await fetch(url, { headers: { Authorization: headers.Authorization } })).status, 401);
+  assert.equal((await fetch(url, { headers: { ...headers, "X-Original-Method": "DELETE" } })).status, 403);
+  const reply = await fetch(url, { headers });
+  assert.equal(reply.status, 200);
+  const content = await reply.text();
+  assert.doesNotMatch(content, /password|person-password/);
+  assert.deepEqual(JSON.parse(content).access.permissions, ["submission:view"]);
+  fixture.accounts.putAccess({ ...invoiceAccess, accountId: "person", enabled: false }, { actor: "test", expectedVersion: 1 });
+  assert.equal((await fetch(url, { headers })).status, 401);
+});
+
+test("staff verification has legacy compatibility before the authentication cutover", async (t) => {
+  const fixture = await startFixture();
+  t.after(() => fixture.close());
+  const response = await login(fixture, { username: "shared-admin", password: "shared-password", returnTo: "/staff" });
+  assert.equal((await verify(fixture, { cookie: cookieFrom(response, "admin_session"), scope: "staff" })).status, 204);
 });

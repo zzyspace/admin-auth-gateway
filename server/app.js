@@ -1,4 +1,6 @@
+import { installAccountManagement } from "./account-management.js";
 import express from "express";
+import { createUnifiedSessionService } from "./unified-session-service.js";
 
 import { renderLoginPage, sanitizeReturnTo, scopeForReturnTo } from "./login-page.js";
 import { createLoginRateLimiter } from "./rate-limit.js";
@@ -81,9 +83,14 @@ function sameOriginMutation(request) {
   return Boolean(origin && expected && secureEqual(origin, expected));
 }
 
-export function createApp({ config, database, now = Date.now }) {
+export function createApp({ config, database, accounts, now = Date.now }) {
   const app = express();
-  const sessions = createSessionService({ config, database, now });
+  const unified = config.authMode === "unified";
+  if (unified && !accounts) throw new Error("Unified mode requires an account store.");
+  const sessionScopes = unified ? ["invoice", "staff", "expense"] : [...INTERNAL_SCOPES];
+  const sessions = unified
+    ? createUnifiedSessionService({ accounts, database, ttlSeconds: config.cookie.maxAgeSeconds, managementAccountIds: config.managementAccountIds, now })
+    : createSessionService({ config, database, now });
   const limiter = createLoginRateLimiter({ ...config.loginRateLimit, now });
   const sessionDays = Math.ceil(config.cookie.maxAgeSeconds / (24 * 60 * 60));
 
@@ -100,7 +107,7 @@ export function createApp({ config, database, now = Date.now }) {
     const returnTo = sanitizeReturnTo(request.query.returnTo);
     const existing = sessions.resolve(
       requestSessionToken(request, config),
-      scopeForReturnTo(returnTo),
+      scopeForReturnTo(returnTo, config.authMode),
     );
     if (existing) {
       response.redirect(303, returnTo);
@@ -123,7 +130,7 @@ export function createApp({ config, database, now = Date.now }) {
     (request, response) => {
       const loginPath = request.path === "/admin-login" ? "/admin-login" : "/login";
       const returnTo = sanitizeReturnTo(request.body.returnTo);
-      const requiredScope = scopeForReturnTo(returnTo);
+      const requiredScope = scopeForReturnTo(returnTo, config.authMode);
       const cookies = parseCookies(request.headers.cookie);
       const suppliedCsrf = typeof request.body.csrfToken === "string" ? request.body.csrfToken : "";
       const cookieCsrf = cookies.get(LOGIN_CSRF_COOKIE) ?? "";
@@ -194,22 +201,25 @@ export function createApp({ config, database, now = Date.now }) {
   app.get(["/auth/api/session", "/admin-auth/api/session"], (request, response) => {
     const token = requestSessionToken(request, config);
     const scopes = {};
-    for (const scope of INTERNAL_SCOPES) {
+    for (const scope of sessionScopes) {
       const resolved = sessions.resolve(token, scope);
       if (resolved) {
         scopes[scope] = {
           accountId: resolved.account.accountId,
           username: resolved.account.username,
-          role: resolved.account.role,
+          role: resolved.access?.role ?? resolved.account.role,
           managerStores: resolved.account.managerStores,
         };
       }
     }
-    if (Object.keys(scopes).length === 0) {
+    const canManageAccounts = unified && Boolean(sessions.resolve(token, "accounts"));
+    if (Object.keys(scopes).length === 0 && !canManageAccounts) {
       response.status(401).json({ success: false, error: { message: "登录已失效。" } });
       return;
     }
-    response.status(200).json({ success: true, scopes });
+    response.status(200).json({ success: true, scopes, canManageAccounts, apps: unified ? Object.keys(scopes) : [
+      ...(scopes.invoice ? ["invoice", "staff"] : []), ...(scopes.reimbursement ? ["expense"] : []),
+    ] });
   });
 
   app.all(["/auth/api/unauthorized", "/admin-auth/api/unauthorized"], (_request, response) => {
@@ -217,8 +227,10 @@ export function createApp({ config, database, now = Date.now }) {
   });
 
   app.get("/internal/verify/:scope", (request, response) => {
-    const scope = request.params.scope;
-    if (!INTERNAL_SCOPES.has(scope)) {
+    const requestedScope = request.params.scope;
+    const scope = unified ? (requestedScope === "reimbursement" ? "expense" : requestedScope)
+      : (requestedScope === "staff" ? "invoice" : requestedScope === "expense" ? "reimbursement" : requestedScope);
+    if (!sessionScopes.includes(scope)) {
       response.sendStatus(404);
       return;
     }
@@ -233,6 +245,13 @@ export function createApp({ config, database, now = Date.now }) {
       return;
     }
 
+    if (unified) {
+      response.set("X-Admin-Account-Id", encodeURIComponent(resolved.account.accountId));
+      response.set("X-Admin-Account-Version", String(resolved.account.version));
+      response.set("X-Admin-Access-Version", String(resolved.access.version));
+      response.sendStatus(204);
+      return;
+    }
     response.set("X-Admin-Authorization", basicAuthorization(
       resolved.account.username,
       resolved.account.password,
@@ -243,6 +262,23 @@ export function createApp({ config, database, now = Date.now }) {
     response.set("X-Admin-Manager-Stores", resolved.account.managerStores.join(","));
     response.sendStatus(204);
   });
+
+  app.get("/internal/authorization/:app", (request, response) => {
+    // Trust the TCP peer, not forwarded client IP headers. The service secret is
+    // backend-only; the opaque Cookie is revalidated instead of trusting IDs.
+    if (!unified || !["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(request.socket.remoteAddress) ||
+        !secureEqual(request.get("Authorization") ?? "", `Bearer ${config.internalToken}`)) {
+      response.sendStatus(403);
+      return;
+    }
+    if (!sessionScopes.includes(request.params.app)) { response.sendStatus(404); return; }
+    if (!sameOriginMutation(request)) { response.sendStatus(403); return; }
+    const authorization = sessions.resolve(requestSessionToken(request, config), request.params.app);
+    if (!authorization) { response.sendStatus(401); return; }
+    response.status(200).json({ success: true, ...authorization });
+  });
+
+  installAccountManagement({ app, config, accounts, sessions });
 
   app.use((_request, response) => {
     response.status(404).json({ success: false, error: { message: "Not found." } });

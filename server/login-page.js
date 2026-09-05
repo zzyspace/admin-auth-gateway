@@ -1,4 +1,5 @@
 const ALLOWED_RETURN_PATHS = [
+  /^\/auth\/accounts\/?$/,
   /^\/invoice\/?$/,
   /^\/staff\/?$/,
   /^\/expense\/?$/,
@@ -15,7 +16,12 @@ export function sanitizeReturnTo(value) {
     : "/invoice";
 }
 
-export function scopeForReturnTo(returnTo) {
+export function scopeForReturnTo(returnTo, mode = "legacy") {
+  if (mode === "unified") {
+    if (returnTo.startsWith("/auth/accounts")) return "accounts";
+    if (returnTo.startsWith("/staff") || returnTo.startsWith("/employee")) return "staff";
+    return returnTo.startsWith("/expense") || returnTo.startsWith("/reimbursement") ? "expense" : "invoice";
+  }
   return returnTo.startsWith("/expense") || returnTo.startsWith("/reimbursement")
     ? "reimbursement"
     : "invoice";
@@ -32,7 +38,7 @@ function escapeHtml(value) {
 
 export function renderLoginPage({ csrfToken, returnTo, sessionDays, error = "", actionPath = "/login" }) {
   const safeReturnTo = sanitizeReturnTo(returnTo);
-  const destination = safeReturnTo.startsWith("/expense") || safeReturnTo.startsWith("/reimbursement")
+  const destination = safeReturnTo.startsWith("/auth/accounts") ? "账号管理" : safeReturnTo.startsWith("/expense") || safeReturnTo.startsWith("/reimbursement")
     ? "报账后台"
     : safeReturnTo.startsWith("/staff") || safeReturnTo.startsWith("/employee")
       ? "员工资料后台"
