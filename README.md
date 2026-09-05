@@ -2,8 +2,8 @@
 
 Unified accounts support opt-in `ADMIN_AUTH_MODE=unified` with independent
 invoice, staff, and expense grants. Legacy mode remains the default. Backend
-integration and management UI are implemented and verified locally; production
-cutover remains pending. See [the rollout plan and migration guide](docs/unified-accounts.md).
+integration and management UI were enabled and verified in production on
+2026-09-06. See [the rollout plan and migration guide](docs/unified-accounts.md).
 
 Shared login and persistent server-side sessions for these existing admin
 applications:
