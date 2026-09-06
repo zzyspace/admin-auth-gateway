@@ -71,11 +71,22 @@ export async function checkBrowser({ gateway, invoice, staff, expense, cookie, o
     }
     const expenseAccess = page.locator('form[action="/auth/accounts/access"]').filter({ has: page.locator('input[name="app"][value="expense"]') });
     await expenseAccess.locator('[name="enabled"]').check();
-    await expenseAccess.locator('[name="role"]').selectOption("partner");
-    await expenseAccess.locator('[name="permissions"][value="report:view"]').check();
-    await expenseAccess.locator('[name="ownership"]').selectOption("any");
-    await expenseAccess.locator('[name="viewAll"]').check();
-    await expenseAccess.locator('[name="viewChannelsAll"]').check();
+    await expenseAccess.locator('[name="template"]').selectOption("expense-manager");
+    assert.match(await expenseAccess.locator('[data-preview]').innerText(), /范围为空/);
+    await expenseAccess.locator('[name="template"]').selectOption("expense-readonly");
+    assert.equal(await expenseAccess.locator('[name="role"]').inputValue(), "partner");
+    assert.equal(await expenseAccess.locator('[name="viewChannels"]:checked').count(), 6);
+    await expenseAccess.locator('[name="viewChannels"][value="reimbursement_peanut"]').uncheck();
+    assert.equal(await expenseAccess.locator('[data-master="view"]').evaluate((input) => input.indeterminate), true);
+    await expenseAccess.locator('[data-master="view"]').check();
+    assert.equal(await expenseAccess.locator('[name="viewChannels"]:checked').count(), 6);
+    assert.match(await expenseAccess.locator('[data-preview]').innerText(), /Fuzzy普通报账/);
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      const size = await page.evaluate(() => ({ width: innerWidth, scroll: document.documentElement.scrollWidth }));
+      assert.ok(size.scroll <= size.width, JSON.stringify(size));
+      await page.screenshot({ path: `${dir}/accounts-expense-matrix-${width}.png`, fullPage: true });
+    }
     await expenseAccess.getByRole("button").click();
     await page.waitForLoadState("load");
     await context.clearCookies();

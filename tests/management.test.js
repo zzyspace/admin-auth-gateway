@@ -27,7 +27,13 @@ test("management is explicit, supports isolated management login and protects al
   const html = await page.text();
   assert.doesNotMatch(html, /fixture-password/);
   const csrf = html.match(/name="csrf" value="([^"]+)"/)[1];
-  const post = (action, body, extra = {}) => fetch(base + "/auth/accounts/" + action, { method: "POST", redirect: "manual", headers: { ...headers, Origin: base, "Content-Type": "application/x-www-form-urlencoded", ...extra }, body: new URLSearchParams({ csrf, ...body }) });
+  const post = (action, body, extra = {}) => {
+    const form = new URLSearchParams({ csrf });
+    for (const [name, value] of Object.entries(body)) {
+      for (const item of Array.isArray(value) ? value : [value]) form.append(name, item);
+    }
+    return fetch(base + "/auth/accounts/" + action, { method: "POST", redirect: "manual", headers: { ...headers, Origin: base, "Content-Type": "application/x-www-form-urlencoded", ...extra }, body: form });
+  };
   assert.equal((await post("create", { username: "bad", displayName: "bad", password: "secret" }, { Origin: "https://evil.test", "X-Original-Method": "GET" })).status, 403);
   assert.equal((await post("create", { csrf: "wrong", username: "bad", password: "secret" })).status, 403);
   const created = await post("create", { username: "new-person", displayName: "<script>fixture</script>", password: "private-fixture" });
@@ -40,10 +46,23 @@ test("management is explicit, supports isolated management login and protects al
   assert.equal((await post("access", { accountId: person.accountId, app: "invoice", role: "viewer", enabled: "1", version: "0", permissions: "submission:view", viewStores: "fuzzy" })).status, 303);
   assert.deepEqual(accounts.getAccess(person.accountId, "invoice").config, { viewScope: { stores: ["fuzzy"], ownership: "any" } });
   assert.equal((await post("access", { accountId: person.accountId, app: "invoice", role: "admin", version: "0", permissions: "submission:delete" })).status, 409);
+  assert.equal((await post("access", { accountId: person.accountId, app: "staff", role: "operator", enabled: "1", version: "0", permissions: "employee:edit", viewStores: "fuzzy" })).status, 400);
+  assert.equal((await post("access", { accountId: person.accountId, app: "expense", role: "manager", enabled: "1", version: "0", permissions: ["report:view", "report:submit", "report:import"], ownership: "self", viewChannels: "reimbursement_fuzzy_manager", submitChannels: "reimbursement_peanut_manager", importChannels: "reimbursement_fuzzyqz" })).status, 303);
+  assert.deepEqual(accounts.getAccess(person.accountId, "expense").config, {
+    viewScope: { ownership: "self", stores: ["fuzzy"], channels: ["reimbursement_fuzzy_manager"] },
+    submitScope: { stores: ["peanut"], channels: ["reimbursement_peanut_manager"] },
+    importScope: { stores: ["fuzzyqz"], channels: ["reimbursement_fuzzyqz"] },
+  });
   assert.equal((await post("identity", { accountId: "owner", version: "1", username: "owner", displayName: "Owner", password: "" })).status, 400);
-  assert.equal((await post("identity", { accountId: person.accountId, version: "1", username: "new-person", displayName: "New", password: "changed", enabled: "1" })).status, 303);
+  assert.equal((await post("identity", { accountId: person.accountId, version: "1", username: "new-person", displayName: "New", password: "changed", enabled: "1" })).status, 400);
+  assert.equal((await post("identity", { accountId: person.accountId, version: "1", username: "new-person", displayName: "New", password: "changed", confirmPassword: "1", enabled: "1" })).status, 303);
   assert.ok(accounts.authenticate("new-person", "changed"));
   assert.ok(accounts.listAudit().some((row) => row.actor === "owner" && row.account_id === person.accountId));
+  assert.equal((await post("access", { accountId: person.accountId, app: "invoice", role: "viewer", enabled: "1", version: "1", permissions: "submission:view", viewStores: "fuzzy_qz" })).status, 303);
+  const refreshed = await (await fetch(`${base}/auth/accounts?account=${encodeURIComponent(person.accountId)}`, { headers })).text();
+  assert.match(refreshed, /不可修改的账号 ID/);
+  assert.match(refreshed, /数据范围已变化/);
+  assert.doesNotMatch(refreshed, /changed/);
   config.managementAccountIds.length = 0;
   assert.equal((await fetch(base + "/auth/accounts", { headers })).status, 403);
 });

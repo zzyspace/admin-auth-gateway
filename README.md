@@ -5,6 +5,11 @@ invoice, staff, and expense grants. Legacy mode remains the default. Backend
 integration and management UI were enabled and verified in production on
 2026-09-06. See [the rollout plan and migration guide](docs/unified-accounts.md).
 
+The account-management UI uses permission templates, linked permission
+dependencies, channel matrices, separate view/submit/import scopes, and a live
+effective-access preview. Server-side validation rejects contradictory or empty
+enabled grants even when requests bypass the browser UI.
+
 Shared login and persistent server-side sessions for these existing admin
 applications:
 

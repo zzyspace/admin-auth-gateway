@@ -1,6 +1,7 @@
 import { installAccountManagement } from "./account-management.js";
 import express from "express";
 import { createUnifiedSessionService } from "./unified-session-service.js";
+import { accessDestination } from "./account-policy.js";
 
 import { renderLoginPage, sanitizeReturnTo, scopeForReturnTo } from "./login-page.js";
 import { createLoginRateLimiter } from "./rate-limit.js";
@@ -160,7 +161,9 @@ export function createApp({ config, database, accounts, now = Date.now }) {
       const password = typeof request.body.password === "string" ? request.body.password : "";
       const matches = sessions.authenticate(username, password);
 
-      if (!matches.some(({ scope }) => scope === requiredScope)) {
+      if (!matches.some(({ scope, access }) =>
+        scope === requiredScope && (!unified || scope === "accounts" || accessDestination(scope, access)),
+      )) {
         limiter.recordFailure(rateLimitKey);
         const csrfToken = randomToken();
         response.cookie(LOGIN_CSRF_COOKIE, csrfToken, csrfCookieOptions(config, loginPath));
@@ -201,6 +204,7 @@ export function createApp({ config, database, accounts, now = Date.now }) {
   app.get(["/auth/api/session", "/admin-auth/api/session"], (request, response) => {
     const token = requestSessionToken(request, config);
     const scopes = {};
+    const destinations = {};
     for (const scope of sessionScopes) {
       const resolved = sessions.resolve(token, scope);
       if (resolved) {
@@ -210,6 +214,10 @@ export function createApp({ config, database, accounts, now = Date.now }) {
           role: resolved.access?.role ?? resolved.account.role,
           managerStores: resolved.account.managerStores,
         };
+        if (unified) {
+          const destination = accessDestination(scope, resolved.access);
+          if (destination) destinations[scope] = destination;
+        }
       }
     }
     const canManageAccounts = unified && Boolean(sessions.resolve(token, "accounts"));
@@ -217,7 +225,9 @@ export function createApp({ config, database, accounts, now = Date.now }) {
       response.status(401).json({ success: false, error: { message: "登录已失效。" } });
       return;
     }
-    response.status(200).json({ success: true, scopes, canManageAccounts, apps: unified ? Object.keys(scopes) : [
+    response.status(200).json({ success: true, scopes, canManageAccounts, destinations: unified ? destinations : {
+      invoice: "/invoice", staff: "/staff", expense: "/expense",
+    }, apps: unified ? Object.keys(destinations) : [
       ...(scopes.invoice ? ["invoice", "staff"] : []), ...(scopes.reimbursement ? ["expense"] : []),
     ] });
   });

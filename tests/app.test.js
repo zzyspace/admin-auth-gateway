@@ -503,6 +503,33 @@ test("unified HTTP login separates staff from invoice and never forwards passwor
   assert.deepEqual((await status.json()).apps, ["invoice"]);
 });
 
+test("session destinations send submit-only expense accounts to the usable page", async (t) => {
+  const records = [{
+    account: { accountId: "submitter", username: "submitter", password: "person-password" },
+    access: [{ app: "expense", role: "manager", permissions: ["report:submit"], enabled: true,
+      config: { viewScope: { ownership: "self", stores: [], channels: [] }, submitScope: { stores: ["fuzzy"], channels: ["reimbursement_fuzzy_manager"] } } }],
+  }];
+  const fixture = await startFixture({ config: unifiedConfig(), records });
+  t.after(() => fixture.close());
+  const response = await login(fixture, { username: "submitter", password: "person-password", returnTo: "/expense/submit" });
+  assert.equal(response.status, 303);
+  const status = await fetch(`${fixture.baseUrl}/auth/api/session`, { headers: { Cookie: cookieFrom(response, "admin_session") } });
+  const payload = await status.json();
+  assert.deepEqual(payload.apps, ["expense"]);
+  assert.deepEqual(payload.destinations, { expense: "/expense/submit" });
+});
+
+test("enabled grants without a usable entry permission cannot log into that app", async (t) => {
+  const records = [{
+    account: { accountId: "invalid", username: "invalid", password: "person-password" },
+    access: [{ app: "invoice", role: "admin", permissions: ["submission:delete"], enabled: true,
+      config: { viewScope: { ownership: "any", stores: "all" } } }],
+  }];
+  const fixture = await startFixture({ config: unifiedConfig(), records });
+  t.after(() => fixture.close());
+  assert.equal((await login(fixture, { username: "invalid", password: "person-password", returnTo: "/invoice" })).status, 401);
+});
+
 test("internal authorization requires service secret, session and valid mutation origin", async (t) => {
   const fixture = await startFixture({ config: unifiedConfig(), records: unifiedRecords });
   t.after(() => fixture.close());

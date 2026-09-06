@@ -184,7 +184,11 @@ test("unified authorization across the three applications", async (t) => {
   });
   await t.test("new manual imports derive ownership from the session and constrain their target channel", async () => {
     accounts.createAccount({ accountId: "importer", username: "importer", password: "test-password" }, { actor });
-    accounts.putAccess({ ...expenseGrant, accountId: "importer", role: "partner", permissions: ["report:view", "report:import"] }, { actor, expectedVersion: 0 });
+    accounts.putAccess({ ...expenseGrant, accountId: "importer", role: "partner", permissions: ["report:view", "report:import"], config: {
+      ...expenseGrant.config,
+      submitScope: { stores: ["peanut"], channels: ["reimbursement_peanut_manager"] },
+      importScope: { stores: ["fuzzy"], channels: ["reimbursement_fuzzy_manager"] },
+    } }, { actor, expectedVersion: 0 });
     const importedCookie = await login("importer", "/expense");
     for (const channel of ["reimbursement_peanut_manager", "reimbursement_fuzzy_manager"]) {
       const form = new FormData();

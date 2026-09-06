@@ -133,12 +133,15 @@ export function createAccountStore({ stateDir, now = Date.now }) {
       action TEXT NOT NULL,
       account_id TEXT NOT NULL,
       app TEXT,
-      version INTEGER NOT NULL
+      version INTEGER NOT NULL,
+      details_json TEXT NOT NULL DEFAULT '{}'
     );
   `);
-  function audit(actor, action, accountId, app, version) {
-    db.prepare(`INSERT INTO account_audit (occurred_at, actor, action, account_id, app, version)
-      VALUES (?, ?, ?, ?, ?, ?)`).run(now(), requiredText(actor), action, accountId, app, version);
+  const auditColumns = new Set(db.prepare("PRAGMA table_info(account_audit)").all().map((column) => column.name));
+  if (!auditColumns.has("details_json")) db.exec("ALTER TABLE account_audit ADD COLUMN details_json TEXT NOT NULL DEFAULT '{}'");
+  function audit(actor, action, accountId, app, version, details = {}) {
+    db.prepare(`INSERT INTO account_audit (occurred_at, actor, action, account_id, app, version, details_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`).run(now(), requiredText(actor), action, accountId, app, version, JSON.stringify(details));
   }
   function getAccount(accountId) {
     return publicAccount(db.prepare(`SELECT ${PUBLIC_ACCOUNT_COLUMNS} FROM accounts WHERE account_id = ?`).get(accountId));
@@ -154,7 +157,9 @@ export function createAccountStore({ stateDir, now = Date.now }) {
     db.prepare(`INSERT INTO accounts (account_id, username, display_name, password, enabled, version)
       VALUES (@accountId, @username, @displayName, @password, @enabled, 1)`)
       .run({ ...value, enabled: Number(value.enabled) });
-    audit(actor, "account:create", value.accountId, null, 1);
+    audit(actor, "account:create", value.accountId, null, 1, {
+      username: value.username, displayName: value.displayName, enabled: value.enabled,
+    });
     return getAccount(value.accountId);
   }
   function putAccess(input, { actor, expectedVersion }) {
@@ -169,7 +174,10 @@ export function createAccountStore({ stateDir, now = Date.now }) {
         permissions_json = excluded.permissions_json, config_json = excluded.config_json,
         enabled = excluded.enabled, version = excluded.version`)
       .run({ ...value, enabled: Number(value.enabled), version });
-    audit(actor, "access:put", value.accountId, value.app, version);
+    audit(actor, "access:put", value.accountId, value.app, version, {
+      before: existing ? { role: existing.role, permissions: existing.permissions, config: existing.config, enabled: existing.enabled } : null,
+      after: { role: value.role, permissions: JSON.parse(value.permissionsJson), config: JSON.parse(value.configJson), enabled: value.enabled },
+    });
     return getAccess(value.accountId, value.app);
   }
 
@@ -211,7 +219,11 @@ export function createAccountStore({ stateDir, now = Date.now }) {
         db.prepare(`UPDATE accounts SET username = @username, display_name = @displayName,
           password = @password, enabled = @enabled, version = version + 1 WHERE account_id = @accountId`)
           .run({ ...value, enabled: Number(value.enabled) });
-        audit(actor, "account:update", accountId, null, expectedVersion + 1);
+        audit(actor, "account:update", accountId, null, expectedVersion + 1, {
+          before: { username: existing.username, displayName: existing.display_name, enabled: Boolean(existing.enabled) },
+          after: { username: value.username, displayName: value.displayName, enabled: value.enabled },
+          passwordChanged: Object.hasOwn(changes, "password"),
+        });
         return getAccount(accountId);
       }).immediate();
     },
@@ -234,8 +246,12 @@ export function createAccountStore({ stateDir, now = Date.now }) {
       }).immediate();
     },
     listAudit() {
-      // Audit contains identifiers and versions only, never credential/config values.
-      return db.prepare("SELECT * FROM account_audit ORDER BY id").all();
+      // Audit records authorization changes but never password values.
+      return db.prepare("SELECT * FROM account_audit ORDER BY id").all().map((row) => ({
+        ...row,
+        details: JSON.parse(row.details_json),
+        details_json: undefined,
+      }));
     },
     close() { db.close(); },
   };

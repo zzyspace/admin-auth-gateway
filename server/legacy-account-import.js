@@ -27,6 +27,7 @@ function expenseGrant(account) {
     config: {
       viewScope: { ownership: manager ? "self" : "any", stores, channels: manager ? channels : "all" },
       submitScope: { stores, channels },
+      importScope: { stores, channels },
     },
   };
 }

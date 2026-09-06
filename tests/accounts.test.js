@@ -47,6 +47,18 @@ test("accounts preserve exact credentials and never return passwords in public d
   }
 });
 
+test("audit records useful account and permission deltas without passwords", (t) => {
+  const { accounts } = fixture(t);
+  accounts.createAccount(identity, { actor });
+  accounts.putAccess(grant("invoice"), { actor, expectedVersion: 0 });
+  accounts.putAccess(grant("invoice", { permissions: ["record:view", "record:edit"] }), { actor, expectedVersion: 1 });
+  accounts.updateAccount(identity.accountId, { password: "changed-secret" }, { actor, expectedVersion: 1 });
+  const audit = accounts.listAudit();
+  assert.deepEqual(audit[2].details.after.permissions, ["record:edit", "record:view"]);
+  assert.equal(audit[3].details.passwordChanged, true);
+  assert.doesNotMatch(JSON.stringify(audit), /changed-secret| secret /);
+});
+
 test("invoice and staff grants are independent; role names do not grant other applications", (t) => {
   const { accounts, sessions } = fixture(t);
   seed(accounts, ["invoice"]);
@@ -188,4 +200,29 @@ test("data persists across a second store connection and sessions contain no pas
       assert.ok(!serialized.includes(token));
     } finally { db.close(); }
   } finally { second.close(); }
+});
+
+test("existing audit tables gain structured details without losing old rows", (t) => {
+  const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "gateway-audit-migration-"));
+  t.after(() => fs.rmSync(stateDir, { recursive: true, force: true }));
+  const raw = new Database(path.join(stateDir, "accounts.db"));
+  raw.exec(`
+    CREATE TABLE accounts (account_id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, display_name TEXT NOT NULL, password TEXT NOT NULL, enabled INTEGER NOT NULL, version INTEGER NOT NULL);
+    CREATE TABLE account_access (account_id TEXT NOT NULL, app TEXT NOT NULL, role TEXT NOT NULL, permissions_json TEXT NOT NULL, config_json TEXT NOT NULL, enabled INTEGER NOT NULL, version INTEGER NOT NULL, PRIMARY KEY (account_id, app));
+    CREATE TABLE account_audit (id INTEGER PRIMARY KEY, occurred_at INTEGER NOT NULL, actor TEXT NOT NULL, action TEXT NOT NULL, account_id TEXT NOT NULL, app TEXT, version INTEGER NOT NULL);
+    INSERT INTO account_audit (occurred_at, actor, action, account_id, app, version) VALUES (1, 'legacy', 'access:put', 'person', 'expense', 1);
+  `);
+  raw.close();
+  const accounts = createAccountStore({ stateDir });
+  try {
+    assert.deepEqual(accounts.listAudit()[0].details, {});
+    const inspection = new Database(path.join(stateDir, "accounts.db"), { readonly: true });
+    try {
+      assert.ok(new Set(inspection.prepare("PRAGMA table_info(account_audit)").all().map((column) => column.name)).has("details_json"));
+    } finally {
+      inspection.close();
+    }
+  } finally {
+    accounts.close();
+  }
 });
