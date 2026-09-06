@@ -58,7 +58,7 @@ export async function checkBrowser({ gateway, invoice, staff, expense, cookie, o
     await access.locator('[name="enabled"]').check();
     await access.locator('[name="permissions"][value="submission:view"]').check();
     await access.locator('[name="viewStores"][value="fuzzy"]').check();
-    await access.getByRole("button").click();
+    await access.getByRole("button", { name: "保存开票后台权限", exact: true }).click();
     await page.waitForLoadState("load");
     const account = accounts.listAccounts().find((item) => item.username === "browser-created");
     assert.deepEqual(accounts.getAccess(account.accountId, "invoice").permissions, ["submission:view"]);
@@ -69,6 +69,7 @@ export async function checkBrowser({ gateway, invoice, staff, expense, cookie, o
       const size = await page.evaluate(() => ({ width: innerWidth, scroll: document.documentElement.scrollWidth }));
       assert.ok(size.scroll <= size.width, JSON.stringify(size));
     }
+    await page.setViewportSize({ width: 1440, height: 900 });
     const expenseAccess = page.locator('form[action="/auth/accounts/access"]').filter({ has: page.locator('input[name="app"][value="expense"]') });
     await expenseAccess.locator('[name="enabled"]').check();
     await expenseAccess.locator('[name="template"]').selectOption("expense-manager");
@@ -87,7 +88,8 @@ export async function checkBrowser({ gateway, invoice, staff, expense, cookie, o
       assert.ok(size.scroll <= size.width, JSON.stringify(size));
       await page.screenshot({ path: `${dir}/accounts-expense-matrix-${width}.png`, fullPage: true });
     }
-    await expenseAccess.getByRole("button").click();
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await expenseAccess.getByRole("button", { name: "保存报账后台权限", exact: true }).click();
     await page.waitForLoadState("load");
     await context.clearCookies();
     await page.goto(base + "/login?returnTo=/expense");
