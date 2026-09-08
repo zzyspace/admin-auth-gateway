@@ -88,7 +88,7 @@ export function createApp({ config, database, accounts, now = Date.now }) {
   const app = express();
   const unified = config.authMode === "unified";
   if (unified && !accounts) throw new Error("Unified mode requires an account store.");
-  const sessionScopes = unified ? ["invoice", "staff", "expense"] : [...INTERNAL_SCOPES];
+  const sessionScopes = unified ? ["invoice", "staff", "expense", "store"] : [...INTERNAL_SCOPES];
   const sessions = unified
     ? createUnifiedSessionService({ accounts, database, ttlSeconds: config.cookie.maxAgeSeconds, managementAccountIds: config.managementAccountIds, now })
     : createSessionService({ config, database, now });

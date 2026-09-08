@@ -16,6 +16,13 @@ export const EXPENSE_CHANNELS = Object.freeze({
 });
 
 export const APP_DEFINITIONS = Object.freeze({
+  store: {
+    label: "门店管理",
+    roles: { admin: "管理员", partner: "合伙人", manager: "店长" },
+    permissions: { "coupon:view": "查看优惠券", "coupon:issue": "发放优惠券", "coupon:redeem": "核销优惠券" },
+    dependencies: { "coupon:issue": "coupon:view", "coupon:redeem": "coupon:view" },
+    entry: ["coupon:view"],
+  },
   invoice: {
     label: "开票后台",
     roles: { admin: "管理员", viewer: "查看人员", operator: "操作人员" },
@@ -87,6 +94,7 @@ export function effectiveExpenseChannels(scope) {
 
 export function accessDestination(app, access) {
   if (!access?.enabled) return null;
+  if (app === "store" && access.permissions.includes("coupon:view")) return "/store";
   if (app === "invoice" && access.permissions.includes("submission:view")) return "/invoice";
   if (app === "staff" && access.permissions.includes("employee:view")) return "/staff";
   if (app === "expense") {
@@ -147,7 +155,9 @@ export function normalizeManagedAccess(body, existing) {
       importScope: normalizedExpenseScope(importChannels),
     };
   } else {
-    const stores = selections(body, "viewStores", Object.keys(STORE_DEFINITIONS));
+    const selectedStores = selections(body, "viewStores", Object.keys(STORE_DEFINITIONS));
+    const stores = body.app === "store" && ["admin", "partner"].includes(body.role)
+      ? Object.keys(STORE_DEFINITIONS) : selectedStores;
     if (enabled && stores.length === 0) fail("empty-view-scope", "已启用后台访问，请至少选择一个可管理门店。");
     config = { viewScope: { ownership: "any", stores: normalizedStores(stores) } };
   }

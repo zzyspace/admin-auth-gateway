@@ -3,7 +3,7 @@ import path from "node:path";
 import Database from "better-sqlite3";
 import { secureEqual } from "./security.js";
 
-export const APPLICATIONS = Object.freeze(["invoice", "staff", "expense"]);
+export const APPLICATIONS = Object.freeze(["invoice", "staff", "expense", "store"]);
 const PUBLIC_ACCOUNT_COLUMNS = "account_id, username, display_name, enabled, version";
 
 export class AccountStoreError extends Error {
@@ -118,7 +118,7 @@ export function createAccountStore({ stateDir, now = Date.now }) {
     );
     CREATE TABLE IF NOT EXISTS account_access (
       account_id TEXT NOT NULL REFERENCES accounts(account_id),
-      app TEXT NOT NULL CHECK (app IN ('invoice', 'staff', 'expense')),
+      app TEXT NOT NULL CHECK (app IN ('invoice', 'staff', 'expense', 'store')),
       role TEXT NOT NULL,
       permissions_json TEXT NOT NULL,
       config_json TEXT NOT NULL,
@@ -137,6 +137,26 @@ export function createAccountStore({ stateDir, now = Date.now }) {
       details_json TEXT NOT NULL DEFAULT '{}'
     );
   `);
+  // SQLite CHECK constraints require rebuilding the table. No grants or versions change.
+  const accessSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'account_access'").get().sql;
+  if (!accessSchema.includes("'store'")) {
+    db.transaction(() => {
+      db.exec(`CREATE TABLE account_access_with_store (
+        account_id TEXT NOT NULL REFERENCES accounts(account_id),
+        app TEXT NOT NULL CHECK (app IN ('invoice', 'staff', 'expense', 'store')),
+        role TEXT NOT NULL,
+        permissions_json TEXT NOT NULL,
+        config_json TEXT NOT NULL,
+        enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+        version INTEGER NOT NULL CHECK (version >= 1),
+        PRIMARY KEY (account_id, app)
+      );
+      INSERT INTO account_access_with_store SELECT account_id, app, role, permissions_json, config_json, enabled, version FROM account_access;
+      DROP TABLE account_access;
+      ALTER TABLE account_access_with_store RENAME TO account_access;`);
+      if (db.pragma("foreign_key_check").length) throw new Error("Account migration foreign key check failed.");
+    })();
+  }
   const auditColumns = new Set(db.prepare("PRAGMA table_info(account_audit)").all().map((column) => column.name));
   if (!auditColumns.has("details_json")) db.exec("ALTER TABLE account_audit ADD COLUMN details_json TEXT NOT NULL DEFAULT '{}'");
   function audit(actor, action, accountId, app, version, details = {}) {

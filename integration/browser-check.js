@@ -34,11 +34,30 @@ export async function checkBrowser({ gateway, invoice, staff, expense, cookie, o
       await page.setViewportSize({ width: 1280, height: 900 });
       if (route === "/staff") assert.ok(await page.locator('button[data-action="edit"]').count() > 0);
     }
+    // A newly granted fourth application appears in every existing center menu.
+    accounts.putAccess({ accountId: "operator", app: "store", role: "manager", permissions: ["coupon:view"], config: { viewScope: { ownership: "any", stores: ["fuzzy"] } } }, { actor: "browser-check", expectedVersion: 0 });
+    await context.clearCookies();
+    await page.goto(base + "/login?returnTo=/invoice");
+    await page.locator('#username').fill("operator");
+    await page.locator('#password').fill("test-password");
+    await page.getByRole("button", { name: "登录", exact: true }).click();
+    await page.waitForURL("**/invoice");
+    for (const route of ["/invoice", "/staff", "/expense"]) {
+      await page.goto(base + route);
+      await page.waitForFunction(() => document.querySelector('[data-center="store"]')?.hidden === false);
+      await page.locator('.center-switcher-trigger').click();
+      const storeLink = page.locator('[data-center="store"]');
+      assert.equal(await storeLink.isVisible(), true);
+      assert.equal(await storeLink.getAttribute("href"), "/store");
+      assert.equal((await storeLink.innerText()).trim(), "门店管理");
+      await page.screenshot({ path: `${dir}/${route.slice(1)}-store-navigation.png`, fullPage: true });
+    }
     await context.addCookies([{ name: "admin_session", value: onlyInvoice.split("=")[1], url: base }]);
     await page.goto(base + "/invoice");
     await page.locator("#records-body tr").first().waitFor();
     await page.waitForFunction(() => document.querySelector('[data-center="staff"]').hidden);
     assert.equal(await page.locator('[data-center="expense"]').isVisible(), false);
+    assert.equal(await page.locator('[data-center="store"]').evaluate(link => link.hidden), true);
     // A dedicated management account has no business grants.
     accounts.createAccount({ accountId: "browser-owner", username: "browser-owner", password: "browser-fixture" }, { actor: "browser-check" });
     config.managementAccountIds.push("browser-owner");
