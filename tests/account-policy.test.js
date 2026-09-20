@@ -49,6 +49,28 @@ test("permission dependencies and enabled entry behavior fail closed", () => {
   assert.equal(accessDestination("expense", submitOnly), "/expense/submit");
 });
 
+test("expense self deletion is explicit and keeps the configured view scope", () => {
+  const body = {
+    accountId: "person", app: "expense", enabled: "1", role: "manager", ownership: "any",
+    viewChannels: ["reimbursement_fuzzy_manager"], permissions: ["report:view", "report:delete:self"],
+  };
+  const access = normalizeManagedAccess(body);
+  assert.deepEqual(access.permissions, ["report:delete:self", "report:view"]);
+  assert.deepEqual(access.config.viewScope, { ownership: "any", stores: ["fuzzy"], channels: ["reimbursement_fuzzy_manager"] });
+  assert.equal(accessDestination("expense", access), "/expense");
+  assert.throws(() => normalizeManagedAccess({ ...body, permissions: ["report:delete:self"] }), /missing-permission-dependency/);
+  assert.throws(() => normalizeManagedAccess({ ...body, viewChannels: [] }), /empty-view-scope/);
+
+  const viewOnly = normalizeManagedAccess({ ...body, permissions: ["report:view"] });
+  assert.deepEqual(viewOnly.permissions, ["report:view"]);
+  const fullDelete = normalizeManagedAccess({ ...body, role: "admin", permissions: ["report:view", "report:delete"] });
+  assert.deepEqual(fullDelete.permissions, ["report:delete", "report:view"]);
+  assert.deepEqual(fullDelete.config.viewScope, access.config.viewScope);
+  const both = normalizeManagedAccess({ ...body, permissions: ["report:view", "report:delete", "report:delete:self"] });
+  assert.deepEqual(both.permissions, ["report:delete", "report:delete:self", "report:view"]);
+  assert.deepEqual(both.config.viewScope, access.config.viewScope);
+});
+
 test("disabling an existing app retains its complete configuration", () => {
   const existing = { accountId: "person", app: "expense", role: "admin", enabled: true, version: 7, permissions: ["report:view"], config: { viewScope: { ownership: "any", stores: "all", channels: "all" }, submitScope: { stores: [], channels: [] } } };
   assert.deepEqual(normalizeManagedAccess({ app: "expense", role: "admin" }, existing), { ...existing, enabled: false });

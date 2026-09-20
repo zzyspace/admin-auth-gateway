@@ -43,6 +43,11 @@ test("management is explicit, supports isolated management login and protects al
   const editPage = await (await fetch(base + created.headers.get("location"), { headers })).text();
   assert.ok(editPage.includes("&lt;script&gt;fixture&lt;/script&gt;"));
   assert.doesNotMatch(editPage, /private-fixture/);
+  const newSelfDeleteInput = editPage.match(/<input[^>]+name="permissions"[^>]+value="report:delete:self"[^>]*>/)[0];
+  assert.doesNotMatch(newSelfDeleteInput, /\bchecked\b/);
+  assert.match(editPage, /删除本人上传/);
+  assert.match(editPage, /删除查看范围内记录/);
+  assert.match(editPage, /包含已关联本人账号的快捷指令记录/);
   assert.equal((await post("access", { accountId: person.accountId, app: "invoice", role: "viewer", enabled: "1", version: "0", permissions: "submission:view", viewStores: "fuzzy" })).status, 303);
   assert.deepEqual(accounts.getAccess(person.accountId, "invoice").config, { viewScope: { stores: ["fuzzy"], ownership: "any" } });
   assert.equal((await post("access", { accountId: person.accountId, app: "invoice", role: "admin", version: "0", permissions: "submission:delete" })).status, 409);
@@ -53,6 +58,17 @@ test("management is explicit, supports isolated management login and protects al
     submitScope: { stores: ["peanut"], channels: ["reimbursement_peanut_manager"] },
     importScope: { stores: ["fuzzyqz"], channels: ["reimbursement_fuzzyqz"] },
   });
+  assert.ok(!accounts.getAccess(person.accountId, "expense").permissions.includes("report:delete:self"));
+  const selfDeleteAccess = { accountId: person.accountId, app: "expense", role: "manager", enabled: "1", version: "1", permissions: ["report:view", "report:delete:self"], ownership: "any", viewChannels: "reimbursement_fuzzy_manager" };
+  assert.equal((await post("access", { ...selfDeleteAccess, permissions: "report:delete:self" })).status, 400);
+  assert.equal(accounts.getAccess(person.accountId, "expense").version, 1);
+  assert.equal((await post("access", selfDeleteAccess)).status, 303);
+  const savedSelfDelete = accounts.getAccess(person.accountId, "expense");
+  assert.deepEqual(savedSelfDelete.permissions, ["report:delete:self", "report:view"]);
+  assert.deepEqual(savedSelfDelete.config.viewScope, { ownership: "any", stores: ["fuzzy"], channels: ["reimbursement_fuzzy_manager"] });
+  const selfDeletePage = await (await fetch(`${base}/auth/accounts?account=${encodeURIComponent(person.accountId)}`, { headers })).text();
+  assert.match(selfDeletePage.match(/<input[^>]+name="permissions"[^>]+value="report:delete:self"[^>]*>/)[0], /\bchecked\b/);
+  assert.doesNotMatch(selfDeletePage.match(/<input[^>]+name="permissions"[^>]+value="report:delete"[^>]*>/)[0], /\bchecked\b/);
   assert.equal((await post("identity", { accountId: "owner", version: "1", username: "owner", displayName: "Owner", password: "" })).status, 400);
   assert.equal((await post("identity", { accountId: person.accountId, version: "1", username: "new-person", displayName: "New", password: "changed", enabled: "1" })).status, 400);
   assert.equal((await post("identity", { accountId: person.accountId, version: "1", username: "new-person", displayName: "New", password: "changed", confirmPassword: "1", enabled: "1" })).status, 303);

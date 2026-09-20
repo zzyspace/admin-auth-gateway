@@ -10,6 +10,13 @@ dependencies, channel matrices, separate view/submit/import scopes, and a live
 effective-access preview. Server-side validation rejects contradictory or empty
 enabled grants even when requests bypass the browser UI.
 
+Expense grants can include `report:delete:self` (删除本人上传), which requires
+`report:view` and permits deletion only for records attributed to the signed-in
+account within its view scope, including attributed Shortcut uploads. Existing
+`report:delete` still permits deletion of any visible record. Neither permission
+is automatically added to existing accounts. Deploy the reimbursement service
+with support for the new permission before enabling it through this gateway.
+
 Shared login and persistent server-side sessions for these existing admin
 applications:
 

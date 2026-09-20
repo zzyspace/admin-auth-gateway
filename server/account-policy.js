@@ -40,8 +40,8 @@ export const APP_DEFINITIONS = Object.freeze({
   expense: {
     label: "报账后台",
     roles: { admin: "管理员", partner: "合伙人", manager: "店长" },
-    permissions: { "report:view": "查看", "attachment:view": "查看附件", "report:submit": "提交", "report:edit": "编辑", "report:delete": "删除", "report:import": "补录", "task:view:any": "查看他人批量任务" },
-    dependencies: { "attachment:view": "report:view", "report:edit": "report:view", "report:delete": "report:view", "report:import": "report:view", "task:view:any": "report:view" },
+    permissions: { "report:view": "查看", "attachment:view": "查看附件", "report:submit": "提交", "report:edit": "编辑", "report:delete:self": "删除本人上传", "report:delete": "删除查看范围内记录", "report:import": "补录", "task:view:any": "查看他人批量任务" },
+    dependencies: { "attachment:view": "report:view", "report:edit": "report:view", "report:delete:self": "report:view", "report:delete": "report:view", "report:import": "report:view", "task:view:any": "report:view" },
     entry: ["report:view", "report:submit"],
   },
 });
