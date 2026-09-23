@@ -106,7 +106,13 @@ export function createApp({ config, database, accounts, now = Date.now }) {
   app.get(["/login", "/admin-login"], (request, response) => {
     const loginPath = request.path === "/admin-login" ? "/admin-login" : "/login";
     const returnTo = sanitizeReturnTo(request.query.returnTo);
-    const existing = sessions.resolve(
+    // The workbench lists authorized destinations; it does not grant app access.
+    const existing = unified && returnTo === "/mini.html"
+      ? [...sessionScopes, "accounts"].some((scope) => {
+          const resolved = sessions.resolve(requestSessionToken(request, config), scope);
+          return resolved && (scope === "accounts" || accessDestination(scope, resolved.access));
+        })
+      : sessions.resolve(
       requestSessionToken(request, config),
       scopeForReturnTo(returnTo, config.authMode),
     );
@@ -131,7 +137,9 @@ export function createApp({ config, database, accounts, now = Date.now }) {
     (request, response) => {
       const loginPath = request.path === "/admin-login" ? "/admin-login" : "/login";
       const returnTo = sanitizeReturnTo(request.body.returnTo);
-      const requiredScope = scopeForReturnTo(returnTo, config.authMode);
+      const allowedScopes = unified && returnTo === "/mini.html"
+        ? [...sessionScopes, "accounts"]
+        : [scopeForReturnTo(returnTo, config.authMode)];
       const cookies = parseCookies(request.headers.cookie);
       const suppliedCsrf = typeof request.body.csrfToken === "string" ? request.body.csrfToken : "";
       const cookieCsrf = cookies.get(LOGIN_CSRF_COOKIE) ?? "";
@@ -162,7 +170,7 @@ export function createApp({ config, database, accounts, now = Date.now }) {
       const matches = sessions.authenticate(username, password);
 
       if (!matches.some(({ scope, access }) =>
-        scope === requiredScope && (!unified || scope === "accounts" || accessDestination(scope, access)),
+        allowedScopes.includes(scope) && (!unified || scope === "accounts" || accessDestination(scope, access)),
       )) {
         limiter.recordFailure(rateLimitKey);
         const csrfToken = randomToken();

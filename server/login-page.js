@@ -1,4 +1,5 @@
 const ALLOWED_RETURN_PATHS = [
+  /^\/mini\.html$/,
   /^\/store\/?$/,
   /^\/auth\/accounts\/?$/,
   /^\/invoice\/?$/,
@@ -40,7 +41,7 @@ function escapeHtml(value) {
 
 export function renderLoginPage({ csrfToken, returnTo, sessionDays, error = "", actionPath = "/login" }) {
   const safeReturnTo = sanitizeReturnTo(returnTo);
-  const destination = safeReturnTo.startsWith("/store") ? "门店管理" : safeReturnTo.startsWith("/auth/accounts") ? "账号管理" : safeReturnTo.startsWith("/expense") || safeReturnTo.startsWith("/reimbursement")
+  const destination = safeReturnTo === "/mini.html" ? "工作台" : safeReturnTo.startsWith("/store") ? "门店管理" : safeReturnTo.startsWith("/auth/accounts") ? "账号管理" : safeReturnTo.startsWith("/expense") || safeReturnTo.startsWith("/reimbursement")
     ? "报账后台"
     : safeReturnTo.startsWith("/staff") || safeReturnTo.startsWith("/employee")
       ? "员工资料后台"
