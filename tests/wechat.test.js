@@ -1,0 +1,42 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { createAccountStore } from '../server/account-store.js';
+import { createSessionDatabase } from '../server/database.js';
+import { loadConfig } from '../server/config.js';
+import { createApp } from '../server/app.js';
+const cookie=(res,name)=>res.headers.getSetCookie().find(v=>v.startsWith(name+'='))?.split(';')[0];
+test('WeChat binding and cookie handoff preserve identity, scope, replay protection and unlink invalidation',async t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'wechat-login-'));let time=Date.now();
+ const accounts=createAccountStore({stateDir:dir,now:()=>time}),database=createSessionDatabase({stateDir:dir});
+ for(const id of ['one','two','empty']) accounts.createAccount({accountId:id,username:id,displayName:'同名员工',password:'pw-'+id},{actor:'fixture'});
+ for(const id of ['one','two']) accounts.putAccess({accountId:id,app:'store',role:'admin',permissions:['coupon:view'],config:{viewScope:{ownership:'any',stores:'all'}},enabled:true},{actor:'fixture',expectedVersion:0});
+ const config=loadConfig({ADMIN_AUTH_MODE:'unified',ADMIN_AUTH_INTERNAL_TOKEN:'a'.repeat(32),ADMIN_AUTH_COOKIE_SECURE:'false',ADMIN_AUTH_COOKIE_NAME:'admin_session',ADMIN_AUTH_WECHAT_ENABLED:'true',ADMIN_AUTH_WECHAT_APP_ID:'wx7b76ebc181d2f07e',ADMIN_AUTH_WECHAT_APP_SECRET:'a'.repeat(32)});
+ const {app}=createApp({config,database,accounts,now:()=>time,exchangeWechatCode:async(_config,code)=>{if(code==='bad')throw Error('provider secret error');return 'openid-'+code;}});
+ const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));
+ const base='http://127.0.0.1:'+server.address().port; config.wechat.origin=base;
+ t.after(async()=>{await new Promise(resolve=>server.close(resolve));database.close();accounts.close();fs.rmSync(dir,{recursive:true,force:true});});
+ const request=(url,options={})=>fetch(base+url,{redirect:'manual',...options});
+ const post=(url,data,cookies='',origin=base)=>request(url,{method:'POST',headers:{'Content-Type':'application/json',Cookie:cookies,Origin:origin},body:JSON.stringify(data)});
+ async function flow(code){const start=await post('/auth/wechat/flows',{});assert.equal(start.status,200);const {flowId}=await start.json();const browser=cookie(start,'wechat_flow');const exchanged=await post('/auth/wechat/exchange',{flowId,code});assert.equal(exchanged.status,200);return {flowId,browser};}
+ const finish=f=>request('/auth/wechat/complete?flowId='+f.flowId,{headers:{Cookie:f.browser}});
+ async function bind(f,id,password='pw-'+id){const page=await finish(f);assert.equal(page.status,200);const html=await page.text();assert.match(html,/首次绑定微信/);const csrfToken=html.match(/name="csrfToken" value="([^"]+)"/)[1];return request('/login',{method:'POST',headers:{Origin:base,Cookie:f.browser+'; '+cookie(page,'admin_login_csrf'),'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({username:id,password,csrfToken,returnTo:'/mini.html',bindingFlowId:f.flowId})});}
+ assert.equal((await post('/auth/wechat/flows',{},'','https://evil.example')).status,403);
+ const first=await flow('one');assert.equal((await request('/auth/wechat/complete?flowId='+first.flowId)).status,400);
+ assert.equal((await bind(first,'one','wrong')).status,401);assert.equal(accounts.wechatBindingStatus('one').length,0);
+ const linked=await bind(first,'one');assert.equal(linked.status,303);const oldSession=cookie(linked,'admin_session');assert.ok(oldSession);assert.equal((await finish(first)).status,400);
+ const again=await flow('one');const signedIn=await finish(again);assert.equal(signedIn.status,303);const sessionCookie=cookie(signedIn,'admin_session');assert.ok(sessionCookie);
+ const session=await (await request('/auth/api/session',{headers:{Cookie:sessionCookie}})).json();assert.deepEqual(session.destinations,{store:'/store'});assert.equal(session.scopes.store.accountId,'one');assert.equal(session.scopes.store.displayName,'同名员工');
+ assert.equal((await finish(again)).status,400);assert.equal((await post('/auth/wechat/exchange',{flowId:again.flowId,code:'two'})).status,400);
+ const clash=await flow('two');assert.equal((await bind(clash,'one')).status,409);assert.equal(accounts.wechatBindingStatus('two').length,0);
+ const noGrant=await flow('empty');assert.equal((await bind(noGrant,'empty')).status,401);
+ const pending=await flow('one');accounts.unlinkWechat('one',config.wechat.appId,{actor:'fixture',expectedVersion:1});
+ assert.equal((await finish(pending)).status,400);assert.equal((await request('/auth/api/session',{headers:{Cookie:oldSession}})).status,401);assert.equal((await request('/auth/api/session',{headers:{Cookie:sessionCookie}})).status,401);
+ assert.ok(accounts.authenticate('one','pw-one'));assert.equal(accounts.wechatBindingStatus('one').length,0);
+ const expired=await flow('expired');time+=300001;assert.equal((await finish(expired)).status,400);
+ const start=await post('/auth/wechat/flows',{});const data=await start.json();const bad=await post('/auth/wechat/exchange',{flowId:data.flowId,code:'bad'});assert.equal(bad.status,400);assert.ok(!(await bad.text()).includes('secret'));
+ assert.ok(!JSON.stringify(accounts.listAudit()).includes('openid-'));
+ config.wechat.enabled=false;assert.deepEqual(await (await request('/auth/wechat/config')).json(),{enabled:false});assert.equal((await post('/auth/wechat/flows',{})).status,404);
+});

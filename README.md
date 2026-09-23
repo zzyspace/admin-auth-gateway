@@ -141,3 +141,7 @@ The bot service does not need a restart solely for an admin password change.
 新增独立应用 `store`，入口 `/store`，账号管理中的名称为“门店管理”。操作权限为 `coupon:view`、`coupon:issue`、`coupon:redeem`，激活和核销依赖查看。管理员、合伙人配置三店范围 `all`；店长按 `viewScope.stores` 显式选择门店，`ownership` 固定 `any`。角色不授予操作权限或账号管理权限。
 
 启动时会在事务内将旧 `account_access` 应用 CHECK 扩展为支持 `store`，保留既有授权、版本和审计；不会自动添加新后台权限。发布前备份账号数据库，授权变更后重新登录新后台。共享 Nginx 入口仍由 server-infra 管理。
+
+## 微信小程序账号绑定（默认关闭）
+
+新增可选微信登录，仍签发现有 Cookie，会话与权限按 accountId 校验。配置 ADMIN_AUTH_WECHAT_ENABLED、ADMIN_AUTH_WECHAT_APP_ID、ADMIN_AUTH_WECHAT_APP_SECRET；密钥仅保存在服务器环境文件，不进入仓库。所有旧账号可用原密码自行绑定，管理员可在账号管理解绑。完整流程与发布门槛见 `../server-infra/docs/mini-wechat-login.md`。

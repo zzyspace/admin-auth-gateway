@@ -1,3 +1,4 @@
+import { installWechatStore } from './wechat-store.js';
 import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
@@ -202,6 +203,7 @@ export function createAccountStore({ stateDir, now = Date.now }) {
   }
 
   return {
+    ...installWechatStore({ db, now, getAccount, audit }),
     getAccount,
     getAccess,
     listAccounts() {

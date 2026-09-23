@@ -39,6 +39,21 @@ test("management is explicit, supports isolated management login and protects al
     }
     return fetch(base + "/auth/accounts/" + action, { method: "POST", redirect: "manual", headers: { ...headers, Origin: base, "Content-Type": "application/x-www-form-urlencoded", ...extra }, body: form });
   };
+  const browserKey = createHash('sha256').update('browser-fixture').digest('base64url');
+  const appId = 'wx7b76ebc181d2f07e';
+  const flowId = accounts.startWechatFlow(appId, browserKey);
+  accounts.claimWechatFlow(flowId, appId); accounts.finishWechatExchange(flowId, 'private-openid-fixture');
+  accounts.bindWechatFlow(flowId, browserKey, 'business', 1);
+  const unlink = {accountId:'business',appId,version:'1',confirmUnlink:'1'};
+  assert.equal((await post('wechat-unlink', unlink, {Cookie:`admin_session=${business.token}`})).status,403);
+  assert.equal((await post('wechat-unlink', {...unlink,csrf:'wrong'})).status,403);
+  assert.equal((await post('wechat-unlink', {...unlink,confirmUnlink:'0'})).status,400);
+  const bindingPage = await (await fetch(base+'/auth/accounts?account=business',{headers})).text();
+  assert.match(bindingPage,/已绑定个人微信/); assert.doesNotMatch(bindingPage,/private-openid-fixture/);
+  assert.equal((await post('wechat-unlink',unlink)).status,303);
+  assert.equal(accounts.wechatBindingStatus('business').length,0);
+  assert.equal(sessions.resolve(business.token,'invoice'),null);
+  assert.ok(accounts.authenticate('business','fixture-password'));
   assert.equal((await post("create", { username: "bad", displayName: "bad", password: "secret" }, { Origin: "https://evil.test", "X-Original-Method": "GET" })).status, 403);
   assert.equal((await post("create", { csrf: "wrong", username: "bad", password: "secret" })).status, 403);
   const created = await post("create", { username: "new-person", displayName: "<script>fixture</script>", password: "private-fixture" });

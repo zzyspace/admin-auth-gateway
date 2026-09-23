@@ -1,3 +1,5 @@
+import { WechatFlowError } from './wechat-store.js';
+import { installWechatLogin } from './wechat-login.js';
 import { installAccountManagement } from "./account-management.js";
 import express from "express";
 import { createUnifiedSessionService } from "./unified-session-service.js";
@@ -84,7 +86,7 @@ function sameOriginMutation(request) {
   return Boolean(origin && expected && secureEqual(origin, expected));
 }
 
-export function createApp({ config, database, accounts, now = Date.now }) {
+export function createApp({ config, database, accounts, now = Date.now, exchangeWechatCode }) {
   const app = express();
   const unified = config.authMode === "unified";
   if (unified && !accounts) throw new Error("Unified mode requires an account store.");
@@ -106,6 +108,13 @@ export function createApp({ config, database, accounts, now = Date.now }) {
   app.get(["/health/auth", "/healthz"], (_request, response) => {
     response.status(200).json({ ok: true });
   });
+
+  const issueSession = (request, response, matches) => {
+    sessions.destroy(requestSessionToken(request, config));
+    const session = sessions.create(matches);
+    response.cookie(config.cookie.name, session.token, sessionCookieOptions(config));
+  };
+  const wechat = installWechatLogin({ app, config, accounts, sessions, issueSession, exchangeCode: exchangeWechatCode, now });
 
   app.get(["/login", "/admin-login"], (request, response) => {
     const loginPath = request.path === "/admin-login" ? "/admin-login" : "/login";
@@ -140,6 +149,10 @@ export function createApp({ config, database, accounts, now = Date.now }) {
     express.urlencoded({ extended: false, limit: "8kb" }),
     (request, response) => {
       const loginPath = request.path === "/admin-login" ? "/admin-login" : "/login";
+      let bindingFlowId;
+      try { bindingFlowId = wechat.validateBinding(request); }
+      catch (error) { return response.status(400).type('text/plain').send(error instanceof WechatFlowError ? error.message : '微信绑定失败，请重新发起。'); }
+      if (bindingFlowId && request.body.returnTo !== '/mini.html') return response.sendStatus(400);
       const returnTo = sanitizeReturnTo(request.body.returnTo);
       const allowedScopes = unified && returnTo === "/mini.html"
         ? [...sessionScopes, "accounts"]
@@ -164,6 +177,7 @@ export function createApp({ config, database, accounts, now = Date.now }) {
           returnTo,
           sessionDays,
           actionPath: loginPath,
+          bindingFlowId,
           error: "登录尝试次数过多，请稍后再试。",
         }));
         return;
@@ -184,16 +198,19 @@ export function createApp({ config, database, accounts, now = Date.now }) {
           returnTo,
           sessionDays,
           actionPath: loginPath,
+          bindingFlowId,
           error: "账号或密码不正确。",
         }));
         return;
       }
 
+      if (bindingFlowId) {
+        try { wechat.bind(request, response, bindingFlowId, matches[0].account); }
+        catch (error) { return response.status(409).type('text/plain').send(error instanceof WechatFlowError ? error.message : '微信绑定失败，请重新发起。'); }
+      }
       limiter.clear(rateLimitKey);
-      sessions.destroy(requestSessionToken(request, config));
-      const session = sessions.create(matches);
-      response.cookie(config.cookie.name, session.token, sessionCookieOptions(config));
-      response.redirect(303, returnTo);
+      issueSession(request, response, matches);
+      response.redirect(303, bindingFlowId ? "/mini.html?wechatLogin=1" : returnTo);
     },
   );
 
@@ -223,6 +240,7 @@ export function createApp({ config, database, accounts, now = Date.now }) {
         scopes[scope] = {
           accountId: resolved.account.accountId,
           username: resolved.account.username,
+          displayName: resolved.account.displayName || resolved.account.username,
           role: resolved.access?.role ?? resolved.account.role,
           managerStores: resolved.account.managerStores,
         };

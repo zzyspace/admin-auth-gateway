@@ -1,4 +1,5 @@
 import { hashToken, randomToken } from "./security.js";
+import { accessDestination } from './account-policy.js';
 import { APPLICATIONS } from "./account-store.js";
 
 // Unified mode uses per-account and per-app versions on every resolution.
@@ -47,12 +48,19 @@ export function createUnifiedSessionService({ accounts, database, ttlSeconds, ma
   }
   return {
     authenticate,
+    authorizeAccount(accountId) {
+      const account = accounts.getAccount(accountId);
+      if (!account?.enabled) return [];
+      const matches = accounts.listAccess(accountId).filter(access => access.enabled).map(access => ({scope:access.app,account,access}));
+      if (managementAccountIds.includes(accountId)) matches.push({scope:'accounts',account,access:{app:'accounts',version:1}});
+      return matches.some(({scope,access}) => scope === 'accounts' || accessDestination(scope,access)) ? matches : [];
+    },
     create,
     login(username, password) { return create(authenticate(username, password)); },
     resolve,
     destroy(token) {
       if (token) database.delete(hashToken(token));
     },
-    cleanup() { return database.deleteExpired(now()); },
+    cleanup() { accounts.cleanupWechatFlows?.(); return database.deleteExpired(now()); },
   };
 }

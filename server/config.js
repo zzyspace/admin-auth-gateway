@@ -183,7 +183,14 @@ export function loadConfig(env = process.env) {
     throw new Error("__Host- cookies require ADMIN_AUTH_COOKIE_SECURE=true and HTTPS.");
   }
 
+  const wechat = {
+    enabled: parseBoolean(env.ADMIN_AUTH_WECHAT_ENABLED, false, 'ADMIN_AUTH_WECHAT_ENABLED'),
+    appId: env.ADMIN_AUTH_WECHAT_APP_ID ?? '', secret: env.ADMIN_AUTH_WECHAT_APP_SECRET ?? '',
+    origin: 'https://comeover.cn',
+  };
+  if (wechat.enabled && (authMode !== 'unified' || !/^wx[0-9a-f]{16}$/.test(wechat.appId) || !/^[A-Za-z0-9]{16,128}$/.test(wechat.secret))) throw new Error('WeChat login requires unified mode and valid server-side AppID/AppSecret.');
   return {
+    wechat,
     host,
     authMode,
     managementAccountIds: (env.ADMIN_AUTH_MANAGEMENT_ACCOUNT_IDS ?? "").split(",").map((id) => id.trim()).filter(Boolean),

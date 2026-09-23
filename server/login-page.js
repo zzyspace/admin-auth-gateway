@@ -44,7 +44,7 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-export function renderLoginPage({ csrfToken, returnTo, sessionDays, error = "", actionPath = "/login" }) {
+export function renderLoginPage({ csrfToken, returnTo, sessionDays, error = "", actionPath = "/login", bindingFlowId = "" }) {
   const safeReturnTo = sanitizeReturnTo(returnTo);
   const destination = safeReturnTo === "/mini.html" ? "工作台" : safeReturnTo.startsWith("/store") ? "门店管理" : safeReturnTo.startsWith("/auth/accounts") ? "账号管理" : safeReturnTo.startsWith("/expense") || safeReturnTo.startsWith("/reimbursement")
     ? "报账后台"
@@ -89,18 +89,20 @@ export function renderLoginPage({ csrfToken, returnTo, sessionDays, error = "", 
   </head>
   <body>
     <main>
-      <h1>后台登录</h1>
-      <p>登录后进入${escapeHtml(destination)}</p>
+      <h1>${bindingFlowId ? "首次绑定微信" : "后台登录"}</h1>
+      <p>${bindingFlowId ? "使用原账号密码验证身份，登录并绑定当前微信。" : "登录后进入" + escapeHtml(destination)}</p>
       ${error ? `<div class="error" role="alert">${escapeHtml(error)}</div>` : ""}
       <form method="post" action="${escapeHtml(actionPath)}" autocomplete="on">
         <input type="hidden" name="csrfToken" value="${escapeHtml(csrfToken)}">
+        ${bindingFlowId ? `<input type="hidden" name="bindingFlowId" value="${escapeHtml(bindingFlowId)}">` : ""}
         <input type="hidden" name="returnTo" value="${escapeHtml(safeReturnTo)}">
         <label for="username">账号</label>
         <input id="username" name="username" type="text" autocomplete="username" autocapitalize="none" required autofocus>
         <label for="password">密码</label>
         <input id="password" name="password" type="password" autocomplete="current-password" required>
-        <button type="submit">登录</button>
+        <button type="submit">${bindingFlowId ? "登录并绑定微信" : "登录"}</button>
       </form>
+      ${bindingFlowId ? '<p class="note"><a href="/login?returnTo=%2Fmini.html">暂不绑定，使用账号密码登录</a></p>' : ""}
       <p class="note">在此设备上保持登录 ${escapeHtml(sessionDays)} 天。请勿在公共设备上使用。</p>
     </main>
   </body>
