@@ -54,6 +54,21 @@ export function renderLoginPage({ csrfToken, returnTo, sessionDays, error = "", 
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="color-scheme" content="light dark">
     <title>后台登录</title>
+    <script>
+      (() => {
+        const key = "comeover-admin-theme";
+        const media = window.matchMedia("(prefers-color-scheme: dark)");
+        const valid = value => value === "light" || value === "dark";
+        const saved = () => { try { return window.localStorage.getItem(key); } catch { return null; } };
+        const apply = theme => { document.documentElement.dataset.theme = theme; document.documentElement.style.colorScheme = theme; };
+        const preferred = saved();
+        apply(valid(preferred) ? preferred : (media.matches ? "dark" : "light"));
+        window.addEventListener("storage", event => {
+          if (event.key === key) apply(valid(event.newValue) ? event.newValue : (media.matches ? "dark" : "light"));
+        });
+        media.addEventListener("change", event => { if (!valid(saved())) apply(event.matches ? "dark" : "light"); });
+      })();
+    </script>
     <style>
       :root { color-scheme: light dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       * { box-sizing: border-box; }
@@ -67,12 +82,17 @@ export function renderLoginPage({ csrfToken, returnTo, sessionDays, error = "", 
       button { width: 100%; min-height: 48px; margin-top: 24px; border: 0; border-radius: 10px; background: #2e6ce5; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
       .error { margin: 0 0 16px; padding: 11px 13px; border-radius: 9px; background: #fff0f0; color: #a52222; }
       .note { margin: 18px 0 0; font-size: 13px; line-height: 1.5; }
+      :root[data-theme="dark"] body { background: #111827; color: #edf2fb; }
+      :root[data-theme="dark"] main { background: #1c2535; border-color: #344056; box-shadow: none; }
+      :root[data-theme="dark"] p { color: #aab5ca; }
+      :root[data-theme="dark"] input { border-color: #526078; }
+      :root[data-theme="dark"] .error { background: #482424; color: #ffd1d1; }
       @media (prefers-color-scheme: dark) {
-        body { background: #111827; color: #edf2fb; }
-        main { background: #1c2535; border-color: #344056; box-shadow: none; }
-        p { color: #aab5ca; }
-        input { border-color: #526078; }
-        .error { background: #482424; color: #ffd1d1; }
+        :root:not([data-theme="light"]) body { background: #111827; color: #edf2fb; }
+        :root:not([data-theme="light"]) main { background: #1c2535; border-color: #344056; box-shadow: none; }
+        :root:not([data-theme="light"]) p { color: #aab5ca; }
+        :root:not([data-theme="light"]) input { border-color: #526078; }
+        :root:not([data-theme="light"]) .error { background: #482424; color: #ffd1d1; }
       }
     </style>
   </head>
