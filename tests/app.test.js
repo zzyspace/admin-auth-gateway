@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -104,6 +105,20 @@ async function verify(fixture, { cookie, scope, method = "GET", origin = "http:/
     },
   });
 }
+
+test("login theme bootstrap is allowed by its CSP on both login routes", async (t) => {
+  const fixture = await startFixture();
+  t.after(() => fixture.close());
+  for (const route of ["/login", "/admin-login"]) {
+    const response = await fetch(fixture.baseUrl + route);
+    assert.equal(response.status, 200);
+    const html = await response.text();
+    const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+    assert.ok(script);
+    const hash = createHash("sha256").update(script).digest("base64");
+    assert.ok(response.headers.get("content-security-policy")?.includes(`'sha256-${hash}'`));
+  }
+});
 
 test("loadConfig requires both credential groups and safe cookie settings", () => {
   assert.throws(() => loadConfig({}), /INVOICE_ADMIN_USERNAME/);

@@ -1,3 +1,8 @@
+import crypto from "node:crypto";
+
+const LOGIN_THEME_SCRIPT = "\n      (() => {\n        const key = \"comeover-admin-theme\";\n        const media = window.matchMedia(\"(prefers-color-scheme: dark)\");\n        const valid = value => value === \"light\" || value === \"dark\";\n        const saved = () => { try { return window.localStorage.getItem(key); } catch { return null; } };\n        const apply = theme => { document.documentElement.dataset.theme = theme; document.documentElement.style.colorScheme = theme; };\n        const preferred = saved();\n        apply(valid(preferred) ? preferred : (media.matches ? \"dark\" : \"light\"));\n        window.addEventListener(\"storage\", event => {\n          if (event.key === key) apply(valid(event.newValue) ? event.newValue : (media.matches ? \"dark\" : \"light\"));\n        });\n        media.addEventListener(\"change\", event => { if (!valid(saved())) apply(event.matches ? \"dark\" : \"light\"); });\n      })();\n    ";
+export const LOGIN_THEME_SCRIPT_HASH = crypto.createHash("sha256").update(LOGIN_THEME_SCRIPT).digest("base64");
+
 const ALLOWED_RETURN_PATHS = [
   /^\/mini\.html$/,
   /^\/store\/?$/,
@@ -54,21 +59,7 @@ export function renderLoginPage({ csrfToken, returnTo, sessionDays, error = "", 
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="color-scheme" content="light dark">
     <title>后台登录</title>
-    <script>
-      (() => {
-        const key = "comeover-admin-theme";
-        const media = window.matchMedia("(prefers-color-scheme: dark)");
-        const valid = value => value === "light" || value === "dark";
-        const saved = () => { try { return window.localStorage.getItem(key); } catch { return null; } };
-        const apply = theme => { document.documentElement.dataset.theme = theme; document.documentElement.style.colorScheme = theme; };
-        const preferred = saved();
-        apply(valid(preferred) ? preferred : (media.matches ? "dark" : "light"));
-        window.addEventListener("storage", event => {
-          if (event.key === key) apply(valid(event.newValue) ? event.newValue : (media.matches ? "dark" : "light"));
-        });
-        media.addEventListener("change", event => { if (!valid(saved())) apply(event.matches ? "dark" : "light"); });
-      })();
-    </script>
+    <script>${LOGIN_THEME_SCRIPT}</script>
     <style>
       :root { color-scheme: light dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       * { box-sizing: border-box; }

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import fs from "node:fs";
 import os from "node:os";
@@ -26,6 +27,10 @@ test("management is explicit, supports isolated management login and protects al
   assert.equal(page.status, 200);
   const html = await page.text();
   assert.doesNotMatch(html, /fixture-password/);
+  const themeScript = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(themeScript);
+  const themeHash = createHash("sha256").update(themeScript).digest("base64");
+  assert.ok(page.headers.get("content-security-policy")?.includes(`'sha256-${themeHash}'`));
   const csrf = html.match(/name="csrf" value="([^"]+)"/)[1];
   const post = (action, body, extra = {}) => {
     const form = new URLSearchParams({ csrf });

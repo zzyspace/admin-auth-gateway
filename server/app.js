@@ -3,7 +3,7 @@ import express from "express";
 import { createUnifiedSessionService } from "./unified-session-service.js";
 import { accessDestination } from "./account-policy.js";
 
-import { renderLoginPage, sanitizeReturnTo, scopeForReturnTo } from "./login-page.js";
+import { LOGIN_THEME_SCRIPT_HASH, renderLoginPage, sanitizeReturnTo, scopeForReturnTo } from "./login-page.js";
 import { createLoginRateLimiter } from "./rate-limit.js";
 import {
   basicAuthorization,
@@ -98,6 +98,10 @@ export function createApp({ config, database, accounts, now = Date.now }) {
   app.disable("x-powered-by");
   app.set("trust proxy", "loopback");
   app.use(noStore);
+  app.use(["/login", "/admin-login"], (_request, response, next) => {
+    response.set("Content-Security-Policy", `default-src 'none'; style-src 'unsafe-inline'; script-src 'sha256-${LOGIN_THEME_SCRIPT_HASH}'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`);
+    next();
+  });
 
   app.get(["/health/auth", "/healthz"], (_request, response) => {
     response.status(200).json({ ok: true });
