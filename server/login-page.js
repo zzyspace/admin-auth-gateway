@@ -90,7 +90,7 @@ export function renderLoginPage({ csrfToken, returnTo, sessionDays, error = "", 
   <body>
     <main>
       <h1>${bindingFlowId ? "首次绑定微信" : "后台登录"}</h1>
-      <p>${bindingFlowId ? "使用原账号密码验证身份，登录并绑定当前微信。" : "登录后进入" + escapeHtml(destination)}</p>
+      <p>${bindingFlowId ? "输入原账号密码验证身份，后续可用微信免密登陆。" : "登录后进入" + escapeHtml(destination)}</p>
       ${error ? `<div class="error" role="alert">${escapeHtml(error)}</div>` : ""}
       <form method="post" action="${escapeHtml(actionPath)}" autocomplete="on">
         <input type="hidden" name="csrfToken" value="${escapeHtml(csrfToken)}">
