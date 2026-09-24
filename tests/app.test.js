@@ -570,3 +570,22 @@ test("staff verification has legacy compatibility before the authentication cuto
   const response = await login(fixture, { username: "shared-admin", password: "shared-password", returnTo: "/staff" });
   assert.equal((await verify(fixture, { cookie: cookieFrom(response, "admin_session"), scope: "staff" })).status, 204);
 });
+
+
+test("all Mini Program logout destinations return to the chooser without retaining authentication", async (t) => {
+  const fixture = await startFixture({ config: unifiedConfig(), records: unifiedRecords });
+  t.after(() => fixture.close());
+  for (const endpoint of ['/logout','/admin-logout']) {
+    for (const returnTo of ['/invoice','/staff','/expense','/expense/submit','/store','/auth/accounts']) {
+      const signedIn = await login(fixture,{username:'person',password:'person-password',returnTo:'/invoice'});
+      const authCookie = cookieFrom(signedIn,'admin_session');
+      const response = await fetch(fixture.baseUrl+endpoint,{method:'POST',redirect:'manual',headers:{Cookie:authCookie+'; admin_mini_ui=wechat-v1',Origin:fixture.baseUrl,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({returnTo})});
+      assert.equal(response.status,303);assert.equal(response.headers.get('location'),'/mini.html?wechatLogin=1');
+      assert.equal((await verify(fixture,{cookie:authCookie,scope:'invoice'})).status,401);
+    }
+  }
+  const forged = await fetch(fixture.baseUrl+'/logout',{method:'POST',redirect:'manual',headers:{Cookie:'admin_mini_ui=wechat-v1',Origin:'https://evil.example','Content-Type':'application/x-www-form-urlencoded'},body:'returnTo=%2Fstore'});
+  assert.equal(forged.status,403);
+  const ordinary = await fetch(fixture.baseUrl+'/logout',{method:'POST',redirect:'manual',headers:{Origin:fixture.baseUrl,'Content-Type':'application/x-www-form-urlencoded'},body:'returnTo=%2Fstore'});
+  assert.equal(ordinary.headers.get('location'),'/login?returnTo=%2Fstore');
+});

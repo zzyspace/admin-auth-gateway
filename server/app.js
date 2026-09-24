@@ -226,7 +226,10 @@ export function createApp({ config, database, accounts, now = Date.now, exchange
       const returnTo = sanitizeReturnTo(request.body.returnTo);
       sessions.destroy(requestSessionToken(request, config));
       response.clearCookie(config.cookie.name, sessionCookieClearOptions(config));
-      response.redirect(303, `${loginPath}?returnTo=${encodeURIComponent(returnTo)}`);
+      // UI context only: never used to authenticate or authorize a request.
+      const miniCookieName = config.cookie.secure ? "__Host-admin_mini_ui" : "admin_mini_ui";
+      const fromMiniProgram = unified && parseCookies(request.headers.cookie).get(miniCookieName) === "wechat-v1";
+      response.redirect(303, fromMiniProgram ? "/mini.html?wechatLogin=1" : `${loginPath}?returnTo=${encodeURIComponent(returnTo)}`);
     },
   );
 
