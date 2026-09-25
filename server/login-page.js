@@ -56,11 +56,13 @@ export function renderLoginPage({ csrfToken, returnTo, sessionDays, error = "", 
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
     <meta name="color-scheme" content="light dark">
     <title>后台登录</title>
     <script>${LOGIN_THEME_SCRIPT}</script>
     <style>
+      /* Allow touch scrolling without page pinch zoom. */
+      html { touch-action: pan-x pan-y; }
       :root { color-scheme: light dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
       * { box-sizing: border-box; }
       body { margin: 0; min-height: 100svh; display: grid; place-items: center; padding: 24px; background: #eef2f7; color: #172033; }
