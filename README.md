@@ -145,3 +145,5 @@ The bot service does not need a restart solely for an admin password change.
 ## 微信小程序账号绑定（默认关闭）
 
 新增可选微信登录，仍签发现有 Cookie，会话与权限按 accountId 校验。配置 ADMIN_AUTH_WECHAT_ENABLED、ADMIN_AUTH_WECHAT_APP_ID、ADMIN_AUTH_WECHAT_APP_SECRET；密钥仅保存在服务器环境文件，不进入仓库。所有旧账号可用原密码自行绑定，管理员可在账号管理解绑。完整流程与发布门槛见 `../server-infra/docs/mini-wechat-login.md`。
+
+门店管理新增独立权限 `coupon:delete`（删除优惠券），依赖 `coupon:view`；在账号管理中显式勾选，已有授权和角色模板不会自动获得该权限。

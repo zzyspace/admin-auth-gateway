@@ -19,8 +19,8 @@ export const APP_DEFINITIONS = Object.freeze({
   store: {
     label: "门店管理",
     roles: { admin: "管理员", partner: "合伙人", manager: "店长" },
-    permissions: { "coupon:view": "查看优惠券", "coupon:issue": "激活优惠券", "coupon:redeem": "核销优惠券" },
-    dependencies: { "coupon:issue": "coupon:view", "coupon:redeem": "coupon:view" },
+    permissions: { "coupon:view": "查看优惠券", "coupon:issue": "激活优惠券", "coupon:redeem": "核销优惠券", "coupon:delete": "删除优惠券" },
+    dependencies: { "coupon:issue": "coupon:view", "coupon:redeem": "coupon:view", "coupon:delete": "coupon:view" },
     entry: ["coupon:view"],
   },
   invoice: {

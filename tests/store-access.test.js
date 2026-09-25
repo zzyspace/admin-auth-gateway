@@ -19,7 +19,7 @@ test("store roles have explicit operations and fixed or selected store scope", (
   assert.throws(() => normalizeManagedAccess({ ...base, role: "manager" }), /empty-view-scope/);
   const manager = normalizeManagedAccess({ ...base, role: "manager", viewStores: ["peanut", "fuzzy_qz"] });
   assert.deepEqual(manager.config.viewScope, { ownership: "any", stores: ["fuzzy_qz", "peanut"] });
-  for (const permission of ["coupon:issue", "coupon:redeem"]) assert.throws(() => normalizeManagedAccess({ ...base, role: "admin", permissions: [permission] }), /missing-permission-dependency/);
+  for (const permission of ["coupon:issue", "coupon:redeem", "coupon:delete"]) assert.throws(() => normalizeManagedAccess({ ...base, role: "admin", permissions: [permission] }), /missing-permission-dependency/);
   assert.equal(sanitizeReturnTo("/store"), "/store"); assert.equal(sanitizeReturnTo("/store/"), "/store/");
   assert.notEqual(sanitizeReturnTo("/store-evil"), "/store-evil");
   assert.equal(scopeForReturnTo("/store", "unified"), "store");
