@@ -75,3 +75,13 @@ test("disabling an existing app retains its complete configuration", () => {
   const existing = { accountId: "person", app: "expense", role: "admin", enabled: true, version: 7, permissions: ["report:view"], config: { viewScope: { ownership: "any", stores: "all", channels: "all" }, submitScope: { stores: [], channels: [] } } };
   assert.deepEqual(normalizeManagedAccess({ app: "expense", role: "admin" }, existing), { ...existing, enabled: false });
 });
+
+test("monthly reports require an explicit permission and retain the existing view scope", () => {
+  const body = { accountId: "monthly-reader", app: "expense", enabled: "1", role: "partner", ownership: "self", viewChannels: ["reimbursement_fuzzy_manager"], permissions: ["report:view", "report:monthly:view"] };
+  const access = normalizeManagedAccess(body);
+  assert.deepEqual(access.permissions, ["report:monthly:view", "report:view"]);
+  assert.deepEqual(access.config.viewScope, { ownership: "self", stores: ["fuzzy"], channels: ["reimbursement_fuzzy_manager"] });
+  assert.throws(() => normalizeManagedAccess({ ...body, permissions: ["report:monthly:view"] }), /missing-permission-dependency/);
+  assert.throws(() => normalizeManagedAccess({ ...body, viewChannels: [] }), /empty-view-scope/);
+  assert.deepEqual(normalizeManagedAccess({ ...body, role: "admin", permissions: ["report:view"] }).permissions, ["report:view"]);
+});
