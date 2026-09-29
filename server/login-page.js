@@ -11,6 +11,7 @@ const ALLOWED_RETURN_PATHS = [
   /^\/staff\/?$/,
   /^\/expense\/?$/,
   /^\/expense\/submit\/?$/,
+  /^\/expense\/monthly\/?$/,
   /^\/employee\/portal\/?$/,
   /^\/reimbursement\/?$/,
   /^\/reimbursement\/submit\/?$/,
@@ -18,6 +19,20 @@ const ALLOWED_RETURN_PATHS = [
 
 export function sanitizeReturnTo(value) {
   const candidate = typeof value === "string" ? value : "";
+  // Preserve only the report's known filters; never accept arbitrary destinations or queries.
+  if (/^\/expense\/monthly\/?\?/.test(candidate)) {
+    try {
+      const url = new URL(candidate, "https://local.invalid");
+      if (url.origin === "https://local.invalid" && !url.hash &&
+          [...url.searchParams.keys()].every(key => ["month", "store"].includes(key)) &&
+          url.searchParams.getAll("month").length <= 1 && url.searchParams.getAll("store").length <= 1 &&
+          (!url.searchParams.has("month") || /^(19|20|21)\d{2}-(0[1-9]|1[0-2])$/.test(url.searchParams.get("month"))) &&
+          (!url.searchParams.has("store") || ["fuzzy", "peanut", "fuzzyqz"].includes(url.searchParams.get("store")))) {
+        return `${url.pathname}${url.search}`;
+      }
+    } catch {}
+    return "/expense/monthly";
+  }
   return ALLOWED_RETURN_PATHS.some((pattern) => pattern.test(candidate))
     ? candidate
     : "/invoice";
