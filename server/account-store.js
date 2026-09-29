@@ -209,6 +209,10 @@ export function createAccountStore({ stateDir, now = Date.now }) {
     listAccounts() {
       return db.prepare(`SELECT ${PUBLIC_ACCOUNT_COLUMNS} FROM accounts ORDER BY account_id`).all().map(publicAccount);
     },
+    findAccountsByDisplayName(displayName) {
+      return db.prepare(`SELECT ${PUBLIC_ACCOUNT_COLUMNS} FROM accounts WHERE display_name = ? COLLATE BINARY ORDER BY account_id`)
+        .all(displayName).map(publicAccount);
+    },
     listAccess(accountId) {
       return db.prepare("SELECT * FROM account_access WHERE account_id = ? ORDER BY app").all(accountId).map(publicAccess);
     },

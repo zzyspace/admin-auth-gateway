@@ -306,6 +306,26 @@ export function createApp({ config, database, accounts, now = Date.now, exchange
     response.sendStatus(204);
   });
 
+  // Shortcut attribution uses the current managed name without requiring a
+  // browser session. It is only available to the local backend with its secret.
+  app.get("/internal/shortcut-accounts/expense", (request, response) => {
+    if (!unified || !["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(request.socket.remoteAddress) ||
+        !secureEqual(request.get("Authorization") ?? "", `Bearer ${config.internalToken}`)) {
+      response.sendStatus(403);
+      return;
+    }
+    const displayName = request.query.displayName;
+    if (typeof displayName !== "string" || !displayName || displayName !== displayName.trim() || displayName.length > 200) {
+      response.sendStatus(400);
+      return;
+    }
+    const matches = accounts.findAccountsByDisplayName(displayName)
+      .map((account) => accounts.getAuthorization(account.accountId, "expense"))
+      .filter(Boolean)
+      .map((authorization) => ({ success: true, ...authorization }));
+    response.json({ success: true, matches });
+  });
+
   app.get("/internal/authorization/:app", (request, response) => {
     // Trust the TCP peer, not forwarded client IP headers. The service secret is
     // backend-only; the opaque Cookie is revalidated instead of trusting IDs.
