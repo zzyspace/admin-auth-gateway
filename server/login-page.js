@@ -6,6 +6,7 @@ export const LOGIN_THEME_SCRIPT_HASH = crypto.createHash("sha256").update(LOGIN_
 const ALLOWED_RETURN_PATHS = [
   /^\/mini\.html$/,
   /^\/store\/?$/,
+  /^\/business\/?$/,
   /^\/auth\/accounts\/?$/,
   /^\/invoice\/?$/,
   /^\/staff\/?$/,
@@ -40,6 +41,7 @@ export function sanitizeReturnTo(value) {
 
 export function scopeForReturnTo(returnTo, mode = "legacy") {
   if (mode === "unified") {
+    if (returnTo === "/business" || returnTo === "/business/") return "business";
     if (returnTo === "/store" || returnTo === "/store/") return "store";
     if (returnTo.startsWith("/auth/accounts")) return "accounts";
     if (returnTo.startsWith("/staff") || returnTo.startsWith("/employee")) return "staff";
@@ -61,7 +63,7 @@ function escapeHtml(value) {
 
 export function renderLoginPage({ csrfToken, returnTo, sessionDays, error = "", actionPath = "/login", bindingFlowId = "" }) {
   const safeReturnTo = sanitizeReturnTo(returnTo);
-  const destination = safeReturnTo === "/mini.html" ? "工作台" : safeReturnTo.startsWith("/store") ? "门店管理" : safeReturnTo.startsWith("/auth/accounts") ? "账号管理" : safeReturnTo.startsWith("/expense") || safeReturnTo.startsWith("/reimbursement")
+  const destination = safeReturnTo.startsWith("/business") ? "营业数据" : safeReturnTo === "/mini.html" ? "工作台" : safeReturnTo.startsWith("/store") ? "门店管理" : safeReturnTo.startsWith("/auth/accounts") ? "账号管理" : safeReturnTo.startsWith("/expense") || safeReturnTo.startsWith("/reimbursement")
     ? "报账后台"
     : safeReturnTo.startsWith("/staff") || safeReturnTo.startsWith("/employee")
       ? "员工资料后台"

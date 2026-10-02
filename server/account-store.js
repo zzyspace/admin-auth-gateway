@@ -4,7 +4,7 @@ import path from "node:path";
 import Database from "better-sqlite3";
 import { secureEqual } from "./security.js";
 
-export const APPLICATIONS = Object.freeze(["invoice", "staff", "expense", "store"]);
+export const APPLICATIONS = Object.freeze(["invoice", "staff", "expense", "store", "business"]);
 const PUBLIC_ACCOUNT_COLUMNS = "account_id, username, display_name, enabled, version";
 
 export class AccountStoreError extends Error {
@@ -119,7 +119,7 @@ export function createAccountStore({ stateDir, now = Date.now }) {
     );
     CREATE TABLE IF NOT EXISTS account_access (
       account_id TEXT NOT NULL REFERENCES accounts(account_id),
-      app TEXT NOT NULL CHECK (app IN ('invoice', 'staff', 'expense', 'store')),
+      app TEXT NOT NULL CHECK (app IN ('invoice', 'staff', 'expense', 'store', 'business')),
       role TEXT NOT NULL,
       permissions_json TEXT NOT NULL,
       config_json TEXT NOT NULL,
@@ -140,11 +140,11 @@ export function createAccountStore({ stateDir, now = Date.now }) {
   `);
   // SQLite CHECK constraints require rebuilding the table. No grants or versions change.
   const accessSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'account_access'").get().sql;
-  if (!accessSchema.includes("'store'")) {
+  if (!accessSchema.includes("'business'")) {
     db.transaction(() => {
-      db.exec(`CREATE TABLE account_access_with_store (
+      db.exec(`CREATE TABLE account_access_with_business (
         account_id TEXT NOT NULL REFERENCES accounts(account_id),
-        app TEXT NOT NULL CHECK (app IN ('invoice', 'staff', 'expense', 'store')),
+        app TEXT NOT NULL CHECK (app IN ('invoice', 'staff', 'expense', 'store', 'business')),
         role TEXT NOT NULL,
         permissions_json TEXT NOT NULL,
         config_json TEXT NOT NULL,
@@ -152,9 +152,9 @@ export function createAccountStore({ stateDir, now = Date.now }) {
         version INTEGER NOT NULL CHECK (version >= 1),
         PRIMARY KEY (account_id, app)
       );
-      INSERT INTO account_access_with_store SELECT account_id, app, role, permissions_json, config_json, enabled, version FROM account_access;
+      INSERT INTO account_access_with_business SELECT account_id, app, role, permissions_json, config_json, enabled, version FROM account_access;
       DROP TABLE account_access;
-      ALTER TABLE account_access_with_store RENAME TO account_access;`);
+      ALTER TABLE account_access_with_business RENAME TO account_access;`);
       if (db.pragma("foreign_key_check").length) throw new Error("Account migration foreign key check failed.");
     })();
   }

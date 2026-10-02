@@ -16,6 +16,13 @@ export const EXPENSE_CHANNELS = Object.freeze({
 });
 
 export const APP_DEFINITIONS = Object.freeze({
+  business: {
+    label: "营业数据",
+    roles: { admin: "管理员", viewer: "查看人员" },
+    permissions: { "revenue:view": "查看当日营业额" },
+    dependencies: {},
+    entry: ["revenue:view"],
+  },
   store: {
     label: "门店管理",
     roles: { admin: "管理员", partner: "合伙人", manager: "店长" },
@@ -94,6 +101,7 @@ export function effectiveExpenseChannels(scope) {
 
 export function accessDestination(app, access) {
   if (!access?.enabled) return null;
+  if (app === "business" && access.permissions.includes("revenue:view")) return "/business";
   if (app === "store" && access.permissions.includes("coupon:view")) return "/store";
   if (app === "invoice" && access.permissions.includes("submission:view")) return "/invoice";
   if (app === "staff" && access.permissions.includes("employee:view")) return "/staff";
