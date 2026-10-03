@@ -99,6 +99,24 @@ test("management is explicit, supports isolated management login and protects al
   assert.match(refreshed, /不可修改的账号 ID/);
   assert.match(refreshed, /数据范围已变化/);
   assert.doesNotMatch(refreshed, /changed/);
+  assert.equal((await post("access", { accountId: person.accountId, app: "business", role: "viewer", enabled: "1", version: "0", permissions: "revenue:view", viewStores: ["fuzzy", "peanut"] })).status, 303);
+  const beforeDisable = accounts.getAccess(person.accountId, "business");
+  const otherGrants = accounts.listAccess(person.accountId).filter(access => access.app !== "business");
+  const personSession = sessions.login("new-person", "changed");
+  assert.ok(sessions.resolve(personSession.token, "business"));
+  // This is the actual payload shape after JS disables role and scope controls.
+  const disabledPayload = { accountId: person.accountId, app: "business", version: "1" };
+  assert.equal((await post("access", disabledPayload)).status, 303);
+  assert.deepEqual(accounts.getAccess(person.accountId, "business"), { ...beforeDisable, enabled: false, version: 2 });
+  assert.deepEqual(accounts.listAccess(person.accountId).filter(access => access.app !== "business"), otherGrants);
+  assert.equal(sessions.resolve(personSession.token, "business"), null);
+  assert.ok(sessions.resolve(personSession.token, "invoice"));
+  assert.equal((await post("access", disabledPayload)).status, 409, "stale management writes remain rejected");
+  assert.equal((await post("access", { accountId: person.accountId, app: "store", version: "0" })).status, 303);
+  const inactiveStore = accounts.getAccess(person.accountId, "store");
+  assert.equal(inactiveStore.enabled, false);
+  assert.deepEqual(inactiveStore.permissions, []);
+  assert.deepEqual(inactiveStore.config.viewScope.stores, []);
   config.managementAccountIds.length = 0;
   assert.equal((await fetch(base + "/auth/accounts", { headers })).status, 403);
   const status = await fetch(base + "/auth/api/session", { headers });

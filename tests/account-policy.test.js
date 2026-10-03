@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  APP_DEFINITIONS,
   accessDestination,
   effectiveExpenseChannels,
   normalizeManagedAccess,
@@ -74,6 +75,41 @@ test("expense self deletion is explicit and keeps the configured view scope", ()
 test("disabling an existing app retains its complete configuration", () => {
   const existing = { accountId: "person", app: "expense", role: "admin", enabled: true, version: 7, permissions: ["report:view"], config: { viewScope: { ownership: "any", stores: "all", channels: "all" }, submitScope: { stores: [], channels: [] } } };
   assert.deepEqual(normalizeManagedAccess({ app: "expense", role: "admin" }, existing), { ...existing, enabled: false });
+});
+
+test("all app grants can be disabled with the omitted controls produced by the management form", () => {
+  for (const app of Object.keys(APP_DEFINITIONS)) {
+    const existing = { accountId: "person", app, role: "admin", enabled: true, version: 7,
+      permissions: Object.keys(APP_DEFINITIONS[app].permissions),
+      config: { viewScope: { ownership: "self", stores: ["fuzzy"] }, submitScope: { stores: ["peanut"] } },
+    };
+    const before = structuredClone(existing);
+    assert.deepEqual(normalizeManagedAccess({ accountId: "person", app, version: "7" }, existing), { ...before, enabled: false });
+    assert.deepEqual(existing, before);
+  }
+});
+
+test("initial disabled grants have no permissions or scope when browser controls are omitted", () => {
+  const roles = { business: "viewer", invoice: "viewer", staff: "viewer", store: "manager", expense: "partner" };
+  for (const app of Object.keys(APP_DEFINITIONS)) {
+    const access = normalizeManagedAccess({ accountId: "person", app, permissions: ["forged:write"], viewStores: ["peanut"] });
+    assert.equal(access.enabled, false);
+    assert.equal(access.role, roles[app]);
+    assert.deepEqual(access.permissions, []);
+    assert.deepEqual(access.config.viewScope.stores, []);
+    assert.equal(accessDestination(app, access), null);
+  }
+});
+
+test("unknown apps and enabled grants with omitted or invalid roles still fail closed", () => {
+  for (const app of ["unknown", "__proto__", "toString", ["business"]]) {
+    assert.throws(() => normalizeManagedAccess({ accountId: "person", app }), /invalid-app-role/);
+  }
+  for (const app of Object.keys(APP_DEFINITIONS)) {
+    for (const role of [undefined, "unknown-role"]) {
+      assert.throws(() => normalizeManagedAccess({ accountId: "person", app, enabled: "1", role }), /invalid-app-role/);
+    }
+  }
 });
 
 test("monthly reports require an explicit permission and retain the existing view scope", () => {

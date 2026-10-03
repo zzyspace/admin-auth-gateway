@@ -113,17 +113,25 @@ export function accessDestination(app, access) {
 }
 
 export function normalizeManagedAccess(body, existing) {
-  const definition = APP_DEFINITIONS[body.app];
-  if (!definition || !Object.hasOwn(definition.roles, body.role)) {
+  const definition = typeof body.app === "string" && Object.hasOwn(APP_DEFINITIONS, body.app)
+    ? APP_DEFINITIONS[body.app] : null;
+  if (!definition) {
     fail("invalid-app-role", "后台或角色标签无法识别，请刷新页面后重试。");
   }
   const enabled = body.enabled === "1";
+  // Disabled form controls are omitted from submissions. Revocation only needs
+  // the existing grant; do not require or replace its saved role and scopes.
+  if (!enabled && existing) return { ...existing, enabled: false };
+  const role = !enabled && body.role === undefined
+    ? (body.app === "store" ? "manager" : Object.keys(definition.roles)[1]) : body.role;
+  if (!Object.hasOwn(definition.roles, role)) {
+    fail("invalid-app-role", "后台或角色标签无法识别，请刷新页面后重试。");
+  }
   if (!enabled) {
-    if (existing) return { ...existing, enabled: false };
     return {
       accountId: body.accountId,
       app: body.app,
-      role: body.role,
+      role,
       enabled: false,
       permissions: [],
       config: body.app === "expense"
@@ -164,10 +172,10 @@ export function normalizeManagedAccess(body, existing) {
     };
   } else {
     const selectedStores = selections(body, "viewStores", Object.keys(STORE_DEFINITIONS));
-    const stores = body.app === "store" && ["admin", "partner"].includes(body.role)
+    const stores = body.app === "store" && ["admin", "partner"].includes(role)
       ? Object.keys(STORE_DEFINITIONS) : selectedStores;
     if (enabled && stores.length === 0) fail("empty-view-scope", "已启用后台访问，请至少选择一个可管理门店。");
     config = { viewScope: { ownership: "any", stores: normalizedStores(stores) } };
   }
-  return { accountId: body.accountId, app: body.app, role: body.role, enabled, permissions, config };
+  return { accountId: body.accountId, app: body.app, role, enabled, permissions, config };
 }
