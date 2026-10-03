@@ -101,4 +101,9 @@ test("management is explicit, supports isolated management login and protects al
   assert.doesNotMatch(refreshed, /changed/);
   config.managementAccountIds.length = 0;
   assert.equal((await fetch(base + "/auth/accounts", { headers })).status, 403);
+  const status = await fetch(base + "/auth/api/session", { headers });
+  assert.equal(status.status, 200);
+  const session = await status.json();
+  assert.equal(session.canManageAccounts, false);
+  assert.deepEqual(session.apps, []);
 });

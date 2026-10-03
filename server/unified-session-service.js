@@ -2,11 +2,11 @@ import { hashToken, randomToken } from "./security.js";
 import { accessDestination } from './account-policy.js';
 import { APPLICATIONS } from "./account-store.js";
 
-// Unified mode uses per-account and per-app versions on every resolution.
+// Login validity follows the account version; app authorization is read live.
 export function createUnifiedSessionService({ accounts, database, ttlSeconds, managementAccountIds = [], now = Date.now }) {
   if (!Number.isSafeInteger(ttlSeconds) || ttlSeconds < 1) throw new Error("invalid-session-ttl");
-  function resolve(token, app) {
-    if (!token || ![...APPLICATIONS, "accounts"].includes(app)) return null;
+  function resolveIdentity(token) {
+    if (!token) return null;
     const tokenHash = hashToken(token);
     const session = database.find(tokenHash);
     if (!session) return null;
@@ -16,11 +16,21 @@ export function createUnifiedSessionService({ accounts, database, ttlSeconds, ma
     }
     const identity = session.scopes?.unified;
     if (!identity || identity.schema !== 1) return null;
-    const managementAccount = app === "accounts" && managementAccountIds.includes(identity.accountId) ? accounts.getAccount(identity.accountId) : null;
-    const authorization = app === "accounts" ? (managementAccount?.enabled ? { account: managementAccount, access: { app: "accounts", version: 1 } } : null) : accounts.getAuthorization(identity.accountId, app);
-    if (!authorization || authorization.account.version !== identity.accountVersion ||
-        authorization.access.version !== identity.accessVersions?.[app]) return null;
+    const account = accounts.getAccount(identity.accountId);
+    if (!account?.enabled || account.version !== identity.accountVersion) return null;
     database.touch(tokenHash, now());
+    return account;
+  }
+  function resolve(token, app) {
+    if (![...APPLICATIONS, "accounts"].includes(app)) return null;
+    const account = resolveIdentity(token);
+    if (!account) return null;
+    if (app === "accounts") {
+      return managementAccountIds.includes(account.accountId)
+        ? { account, access: { app: "accounts", version: 1 } } : null;
+    }
+    const authorization = accounts.getAuthorization(account.accountId, app);
+    if (!authorization || authorization.account.version !== account.version) return null;
     return authorization;
   }
   function authenticate(username, password) {
@@ -40,6 +50,7 @@ export function createUnifiedSessionService({ accounts, database, ttlSeconds, ma
       tokenHash: hashToken(token),
       scopes: { unified: {
         schema: 1, accountId: account.accountId, accountVersion: account.version,
+        // Retain the old envelope for rollback compatibility, not authorization.
         accessVersions: Object.fromEntries(matches.map(({ access }) => [access.app, access.version])),
       } },
       now: timestamp, expiresAt: timestamp + ttlSeconds * 1000,
@@ -58,6 +69,7 @@ export function createUnifiedSessionService({ accounts, database, ttlSeconds, ma
     create,
     login(username, password) { return create(authenticate(username, password)); },
     resolve,
+    resolveIdentity,
     destroy(token) {
       if (token) database.delete(hashToken(token));
     },

@@ -510,7 +510,7 @@ test("unified HTTP login separates staff from invoice and never forwards passwor
   const response = await login(fixture, { username: "person", password: "person-password", returnTo: "/invoice" });
   assert.equal(response.status, 303);
   const cookie = cookieFrom(response, "admin_session");
-  assert.equal((await verify(fixture, { cookie, scope: "staff" })).status, 401);
+  assert.equal((await verify(fixture, { cookie, scope: "staff" })).status, 403);
   const verified = await verify(fixture, { cookie, scope: "invoice" });
   assert.equal(verified.status, 204);
   assert.equal(verified.headers.get("x-admin-authorization"), null);
@@ -561,7 +561,57 @@ test("internal authorization requires service secret, session and valid mutation
   assert.doesNotMatch(content, /password|person-password/);
   assert.deepEqual(JSON.parse(content).access.permissions, ["submission:view"]);
   fixture.accounts.putAccess({ ...invoiceAccess, accountId: "person", enabled: false }, { actor: "test", expectedVersion: 1 });
-  assert.equal((await fetch(url, { headers })).status, 401);
+  assert.equal((await fetch(url, { headers })).status, 403);
+});
+
+test("one Cookie sees new permissions and app grants while revoked access is forbidden", async (t) => {
+  const fixture = await startFixture({ config: unifiedConfig(), records: unifiedRecords });
+  t.after(() => fixture.close());
+  const response = await login(fixture, { username: "person", password: "person-password", returnTo: "/invoice" });
+  const cookie = cookieFrom(response, "admin_session");
+  const headers = { Cookie: cookie, Authorization: `Bearer ${internalToken}` };
+  const status = () => fetch(`${fixture.baseUrl}/auth/api/session`, { headers: { Cookie: cookie } });
+  const authorization = (app) => fetch(`${fixture.baseUrl}/internal/authorization/${app}`, { headers });
+  fixture.accounts.putAccess({ ...invoiceAccess, accountId: "person", role: "admin",
+    permissions: ["submission:view", "submission:delete"],
+    config: { viewScope: { ownership: "any", stores: ["peanut"] } },
+  }, { actor: "test", expectedVersion: 1 });
+  const updated = await authorization("invoice");
+  assert.equal(updated.status, 200);
+  const payload = await updated.json();
+  assert.deepEqual(payload.access.permissions, ["submission:delete", "submission:view"]);
+  assert.deepEqual(payload.access.config.viewScope.stores, ["peanut"]);
+  const verified = await verify(fixture, { cookie, scope: "invoice" });
+  assert.equal(verified.status, 204);
+  assert.equal(verified.headers.get("x-admin-access-version"), "2");
+  assert.equal((await (await status()).json()).canManageAccounts, false);
+  assert.equal((await fetch(`${fixture.baseUrl}/auth/accounts`, { headers: { Cookie: cookie } })).status, 403);
+  fixture.accounts.putAccess({ accountId: "person", app: "expense", role: "manager", enabled: true,
+    permissions: ["report:submit"], config: { submitScope: { stores: ["fuzzy"], channels: ["reimbursement_fuzzy_manager"] } },
+  }, { actor: "test", expectedVersion: 0 });
+  assert.equal((await verify(fixture, { cookie, scope: "expense" })).status, 204);
+  assert.deepEqual((await (await status()).json()).destinations, { invoice: "/invoice", expense: "/expense/submit" });
+  fixture.accounts.putAccess({ ...invoiceAccess, accountId: "person", enabled: false }, { actor: "test", expectedVersion: 2 });
+  assert.equal((await authorization("invoice")).status, 403);
+  assert.equal((await verify(fixture, { cookie, scope: "invoice" })).status, 403);
+  assert.equal((await authorization("expense")).status, 200);
+  const expense = fixture.accounts.getAccess("person", "expense");
+  fixture.accounts.putAccess({ ...expense, enabled: false }, { actor: "test", expectedVersion: 1 });
+  const empty = await status();
+  assert.equal(empty.status, 200);
+  assert.equal(empty.headers.get("set-cookie"), null);
+  const emptyPayload = await empty.json();
+  assert.deepEqual(emptyPayload.apps, []);
+  assert.equal(emptyPayload.canManageAccounts, false);
+  const chooser = await fetch(`${fixture.baseUrl}/login?returnTo=%2Fmini.html`, { headers: { Cookie: cookie }, redirect: "manual" });
+  assert.equal(chooser.status, 303);
+  assert.equal(chooser.headers.get("location"), "/mini.html");
+  fixture.accounts.putAccess({ ...expense, enabled: true }, { actor: "test", expectedVersion: 2 });
+  assert.equal((await authorization("expense")).status, 200);
+  fixture.accounts.updateAccount("person", { password: "new-password" }, { actor: "test", expectedVersion: 1 });
+  assert.equal((await status()).status, 401);
+  assert.equal((await authorization("expense")).status, 401);
+  assert.equal((await verify(fixture, { cookie, scope: "expense" })).status, 401);
 });
 
 test("staff verification has legacy compatibility before the authentication cutover", async (t) => {

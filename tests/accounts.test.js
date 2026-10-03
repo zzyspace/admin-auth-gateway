@@ -9,6 +9,7 @@ import { createSessionDatabase } from "../server/database.js";
 import { createUnifiedSessionService } from "../server/unified-session-service.js";
 import { createSessionService } from "../server/session-service.js";
 import { loadConfig } from "../server/config.js";
+import { hashToken, randomToken } from "../server/security.js";
 
 const actor = "test-operator";
 const identity = { accountId: "person-1", username: "person", displayName: "测试账号", password: " secret " };
@@ -70,16 +71,25 @@ test("invoice and staff grants are independent; role names do not grant other ap
   assert.equal(sessions.resolve(login.token, "reimbursement"), null);
 });
 
-test("changing one app authorization invalidates only that app in existing sessions", (t) => {
-  const { accounts, sessions } = fixture(t);
-  seed(accounts);
+test("existing sessions use the latest permissions, role and data scope in every app", (t) => {
+  const { accounts, database, sessions } = fixture(t);
+  const apps = ["invoice", "staff", "expense", "store", "business"];
+  seed(accounts, apps);
   const { token } = sessions.login("person", " secret ");
-  accounts.putAccess(grant("staff", { permissions: [] }), { actor, expectedVersion: 1 });
-  assert.equal(sessions.resolve(token, "staff"), null);
-  assert.ok(sessions.resolve(token, "invoice"));
-  assert.ok(sessions.resolve(token, "expense"));
-  const fresh = sessions.login("person", " secret ");
-  assert.deepEqual(sessions.resolve(fresh.token, "staff").access.permissions, []);
+  const storedBefore = database.find(hashToken(token));
+  for (const app of apps) {
+    const expanded = accounts.putAccess(grant(app, {
+      role: "operator", permissions: ["record:view", "record:edit"],
+      config: { viewScope: { stores: "all", ownership: "any" } },
+    }), { actor, expectedVersion: 1 });
+    assert.deepEqual(sessions.resolve(token, app).access, expanded);
+    const reduced = accounts.putAccess(grant(app, {
+      permissions: [], config: { viewScope: { stores: ["peanut"], ownership: "self" } },
+    }), { actor, expectedVersion: 2 });
+    assert.deepEqual(sessions.resolve(token, app).access, reduced);
+    for (const other of apps.filter(value => value !== app)) assert.ok(sessions.resolve(token, other));
+  }
+  assert.deepEqual(database.find(hashToken(token)), storedBefore);
 });
 
 test("password and identity updates invalidate all prior app sessions without restarting", (t) => {
@@ -97,19 +107,23 @@ test("password and identity updates invalidate all prior app sessions without re
   assert.ok(sessions.login("renamed", "new-password"));
 });
 
-test("disabling and re-enabling accounts or grants never resurrects old sessions", (t) => {
+test("app access follows enablement while account disablement permanently invalidates old sessions", (t) => {
   const { accounts, sessions } = fixture(t);
   seed(accounts);
   const { token } = sessions.login("person", " secret ");
   accounts.putAccess(grant("expense", { enabled: false }), { actor, expectedVersion: 1 });
   assert.equal(accounts.getAuthorization(identity.accountId, "expense"), null);
-  accounts.putAccess(grant("expense"), { actor, expectedVersion: 2 });
   assert.equal(sessions.resolve(token, "expense"), null);
+  assert.ok(sessions.resolveIdentity(token));
+  accounts.putAccess(grant("expense"), { actor, expectedVersion: 2 });
+  assert.ok(sessions.resolve(token, "expense"));
   assert.ok(sessions.resolve(token, "invoice"));
   accounts.updateAccount(identity.accountId, { enabled: false }, { actor, expectedVersion: 1 });
   assert.equal(sessions.login("person", " secret "), null);
+  assert.equal(sessions.resolveIdentity(token), null);
   accounts.updateAccount(identity.accountId, { enabled: true }, { actor, expectedVersion: 2 });
   for (const app of ["invoice", "staff", "expense"]) assert.equal(sessions.resolve(token, app), null);
+  assert.equal(sessions.resolveIdentity(token), null);
 });
 
 test("accounts without an enabled grant cannot create a unified session", (t) => {
@@ -120,18 +134,35 @@ test("accounts without an enabled grant cannot create a unified session", (t) =>
   assert.equal(sessions.login("person", " secret "), null);
 });
 
-test("grant additions require a new login; expiration and logout remove sessions", (t) => {
+test("new app grants work in the same session; expiration and logout still remove sessions", (t) => {
   const { accounts, sessions, clock } = fixture(t);
   seed(accounts, ["invoice"]);
   const { token } = sessions.login("person", " secret ");
-  accounts.putAccess(grant("staff"), { actor, expectedVersion: 0 });
-  assert.equal(sessions.resolve(token, "staff"), null);
+  for (const app of ["staff", "expense", "store", "business"]) {
+    accounts.putAccess(grant(app), { actor, expectedVersion: 0 });
+    assert.ok(sessions.resolve(token, app));
+  }
   const fresh = sessions.login("person", " secret ");
-  assert.ok(sessions.resolve(fresh.token, "staff"));
   sessions.destroy(fresh.token);
-  assert.equal(sessions.resolve(fresh.token, "staff"), null);
+  assert.equal(sessions.resolveIdentity(fresh.token), null);
   clock.value += 60000;
   assert.equal(sessions.resolve(token, "invoice"), null);
+  assert.equal(sessions.resolveIdentity(token), null);
+});
+
+test("stored version-one sessions read live authorization without rewriting or extending expiry", (t) => {
+  const { accounts, database, sessions, clock } = fixture(t);
+  seed(accounts, ["invoice"]);
+  const token = randomToken(), tokenHash = hashToken(token);
+  database.create({ tokenHash, scopes: { unified: { schema: 1, accountId: identity.accountId,
+    accountVersion: 1, accessVersions: { invoice: 1 } } }, now: clock.value, expiresAt: 61000 });
+  accounts.putAccess(grant("invoice", { permissions: [] }), { actor, expectedVersion: 1 });
+  accounts.putAccess(grant("staff"), { actor, expectedVersion: 0 });
+  clock.value += 10000;
+  assert.deepEqual(sessions.resolve(token, "invoice").access.permissions, []);
+  assert.ok(sessions.resolve(token, "staff"));
+  assert.equal(database.find(tokenHash).expiresAt, 61000);
+  assert.deepEqual(database.find(tokenHash).scopes.unified.accessVersions, { invoice: 1 });
 });
 
 test("legacy and unified sessions cannot be interpreted as each other", (t) => {

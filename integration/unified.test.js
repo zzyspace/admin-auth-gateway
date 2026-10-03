@@ -113,8 +113,8 @@ test("unified authorization across the three applications", async (t) => {
   }
   if (process.env.AUTH_PLAYWRIGHT_MODULE) await checkBrowser({ gateway, invoice, staff, expense, cookie, onlyInvoice, accounts, config });
   await t.test("sessions, forged headers and Basic fallback cannot cross application boundaries", async () => {
-    assert.equal((await request(staff, "/staff/api/admin/session", onlyInvoice)).status, 401);
-    assert.equal((await request(expense, "/expense/api/session", onlyInvoice)).status, 401);
+    assert.equal((await request(staff, "/staff/api/admin/session", onlyInvoice)).status, 403);
+    assert.equal((await request(expense, "/expense/api/session", onlyInvoice)).status, 403);
     const spoofed = { "X-Admin-Account-Id": "operator", "X-Admin-Role": "admin", Authorization: `Basic ${Buffer.from("legacy:legacy-password").toString("base64")}` };
     for (const [base, route] of [[invoice, "/invoice/api/admin/submissions"], [staff, "/employee/api/admin/submissions"], [expense, "/reimbursement/api/reports"]]) {
       assert.equal((await request(base, route, null, { headers: spoofed })).status, 401);
@@ -143,7 +143,6 @@ test("unified authorization across the three applications", async (t) => {
   });
   await t.test("explicit write grants allow only scoped records and stamp the authenticated actor", async () => {
     accounts.putAccess({ ...invoiceGrant, accountId: "operator", permissions: [...invoiceGrant.permissions, "submission:delete"] }, { actor, expectedVersion: 1 });
-    cookie = await login();
     assert.equal((await request(invoice, "/invoice/api/admin/submissions/peanut", cookie, { method: "DELETE" })).status, 404);
     assert.equal((await request(invoice, "/invoice/api/admin/submissions/fuzzy", cookie, { method: "DELETE" })).status, 200);
     assert.equal(invoiceDb.prepare("SELECT COUNT(*) AS n FROM submissions").get().n, 1);
@@ -201,7 +200,6 @@ test("unified authorization across the three applications", async (t) => {
   });
   await t.test("expense admin label does not bypass data scope or grant writes; submissions reject other channels", async () => {
     accounts.putAccess({ ...expenseGrant, role: "admin", accountId: "operator" }, { actor, expectedVersion: 1 });
-    cookie = await login();
     const list = await (await request(expense, "/expense/api/reports", cookie)).json();
     assert.equal(list.total, 1);
     assert.equal((await request(expense, `/expense/api/reports/${expenseRecords[0]}`, cookie, { method: "PATCH" })).status, 403);
@@ -213,13 +211,25 @@ test("unified authorization across the three applications", async (t) => {
       assert.equal(rejected.status, 400, await rejected.text());
     }
   });
+  await t.test("the same Cookie immediately uses reduced permissions and a changed store scope", async () => {
+    accounts.putAccess({ ...staffGrant, accountId: "operator", permissions: ["employee:view"],
+      config: { viewScope: { ownership: "any", stores: ["peanut"] } },
+    }, { actor, expectedVersion: 1 });
+    const list = await (await request(staff, "/staff/api/admin/submissions", cookie)).json();
+    assert.equal(list.total, 1);
+    assert.deepEqual(list.items.map(item => item.id), ["peanut"]);
+    assert.equal((await request(staff, "/staff/api/admin/submissions/fuzzy", cookie)).status, 404);
+    assert.equal((await request(staff, "/staff/api/admin/attachments/peanut", cookie)).status, 403);
+    assert.equal((await request(staff, "/staff/api/admin/submissions/peanut", cookie, { method: "PATCH" })).status, 403);
+    accounts.putAccess({ ...staffGrant, accountId: "operator" }, { actor, expectedVersion: 2 });
+    assert.equal((await request(staff, "/staff/api/admin/attachments/fuzzy", cookie)).status, 200);
+  });
   await t.test("authorization changes take effect without restarting and never fall back to Basic", async () => {
-    accounts.putAccess({ ...staffGrant, accountId: "operator", enabled: false }, { actor, expectedVersion: 1 });
-    assert.equal((await request(staff, "/staff/api/admin/session", cookie)).status, 401);
+    accounts.putAccess({ ...staffGrant, accountId: "operator", enabled: false }, { actor, expectedVersion: 3 });
+    assert.equal((await request(staff, "/staff/api/admin/session", cookie)).status, 403);
     assert.equal((await request(invoice, "/invoice/api/admin/session", cookie)).status, 200);
     assert.equal((await request(expense, "/expense/api/session", cookie)).status, 200);
     accounts.putAccess({ ...invoiceGrant, accountId: "operator", config: { viewScope: { stores: "all", ownership: "self" } } }, { actor, expectedVersion: 2 });
-    cookie = await login();
     assert.equal((await request(invoice, "/invoice/api/admin/submissions", cookie)).status, 503);
     accounts.updateAccount("operator", { password: "new-password" }, { actor, expectedVersion: 1 });
     assert.equal((await request(expense, "/expense/api/session", cookie)).status, 401);

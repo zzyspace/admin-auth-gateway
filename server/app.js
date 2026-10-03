@@ -121,10 +121,7 @@ export function createApp({ config, database, accounts, now = Date.now, exchange
     const returnTo = sanitizeReturnTo(request.query.returnTo);
     // The workbench lists authorized destinations; it does not grant app access.
     const existing = unified && returnTo === "/mini.html"
-      ? [...sessionScopes, "accounts"].some((scope) => {
-          const resolved = sessions.resolve(requestSessionToken(request, config), scope);
-          return resolved && (scope === "accounts" || accessDestination(scope, resolved.access));
-        })
+      ? sessions.resolveIdentity(requestSessionToken(request, config))
       : sessions.resolve(
       requestSessionToken(request, config),
       scopeForReturnTo(returnTo, config.authMode),
@@ -254,7 +251,8 @@ export function createApp({ config, database, accounts, now = Date.now, exchange
       }
     }
     const canManageAccounts = unified && Boolean(sessions.resolve(token, "accounts"));
-    if (Object.keys(scopes).length === 0 && !canManageAccounts) {
+    if (Object.keys(scopes).length === 0 && !canManageAccounts &&
+        !(unified && sessions.resolveIdentity(token))) {
       response.status(401).json({ success: false, error: { message: "登录已失效。" } });
       return;
     }
@@ -284,7 +282,8 @@ export function createApp({ config, database, accounts, now = Date.now, exchange
 
     const resolved = sessions.resolve(requestSessionToken(request, config), scope);
     if (!resolved) {
-      response.status(401).json({ success: false, error: { message: "需要登录。" } });
+      const status = unified && sessions.resolveIdentity(requestSessionToken(request, config)) ? 403 : 401;
+      response.status(status).json({ success: false, error: { message: status === 403 ? "没有此后台的访问权限。" : "需要登录。" } });
       return;
     }
 
@@ -337,7 +336,7 @@ export function createApp({ config, database, accounts, now = Date.now, exchange
     if (!sessionScopes.includes(request.params.app)) { response.sendStatus(404); return; }
     if (!sameOriginMutation(request)) { response.sendStatus(403); return; }
     const authorization = sessions.resolve(requestSessionToken(request, config), request.params.app);
-    if (!authorization) { response.sendStatus(401); return; }
+    if (!authorization) { response.sendStatus(sessions.resolveIdentity(requestSessionToken(request, config)) ? 403 : 401); return; }
     response.status(200).json({ success: true, ...authorization });
   });
 

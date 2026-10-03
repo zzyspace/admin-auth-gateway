@@ -228,7 +228,7 @@ export function installAccountManagement({ app, config, accounts, sessions }) {
   app.get("/auth/accounts", (request, response) => renderPage(
     response,
     typeof request.query.account === "string" ? request.query.account : "",
-    request.query.saved === "1" ? "已保存。相关旧会话将在下次访问时失效。" : "",
+    request.query.saved === "1" ? "已保存。权限变更将在下次请求时生效，无需重新登录；刷新业务页面可更新按钮和门店选项。账号身份变更或解绑微信仍会使旧会话失效。" : "",
   ));
   app.post("/auth/accounts/:action", express.urlencoded({ extended: false, limit: "32kb" }), (request, response) => {
     if (request.get("Origin") !== `${request.protocol}://${request.get("Host")}` || !secureEqual(request.body.csrf ?? "", response.locals.csrf)) return response.status(403).send("请求来源无效，请重新打开账号管理页面。");
