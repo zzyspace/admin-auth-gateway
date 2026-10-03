@@ -127,7 +127,7 @@ function managementPage({ accounts, selected, csrf, message, managementAccountId
   const accessForms = account ? Object.keys(APP_DEFINITIONS).map((app) => accessForm({ ...account, csrf }, app, accounts.getAccess(account.accountId, app))).join("") : "";
   const recent = accounts.listAudit().slice(-30).reverse();
   const centerIcons = {
-    business: '<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 26V16M16 26V6M25 26V11"/></svg>',
+    business: '<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 26V16M16 26V6M25 26V11"/></svg>',
     store: '<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15v10a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3V15M4 12l2.5-7h19l2.5 7M13 28v-8h6v8"/><path d="M4 12a4 4 0 0 0 8 0 4 4 0 0 0 8 0 4 4 0 0 0 8 0"/></svg>',
     invoice: '<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3.5" width="18" height="25" rx="3"/><path d="M11 9h10M11 14h8M11 19h5"/><circle cx="23" cy="23.5" r="4"/><path d="m21.3 23.5 1.2 1.2 2.2-2.5"/></svg>',
     staff: '<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="10" r="5"/><path d="M6.5 27c.8-6.2 4-9.2 9.5-9.2s8.7 3 9.5 9.2"/></svg>',
@@ -154,8 +154,8 @@ body > .topbar { height: auto; min-height: 64px; padding-block: 13px; border: 0;
 /* Anchor the menu below the full header, including wrapped mobile rows. */
 body > .topbar > .center-switcher { position: static; }
 body > .topbar .center-switcher-menu { top: calc(100% + 9px); left: auto; }
-.center-switcher-option[data-center="business"] svg { color: #007aff; }
-:root[data-theme="dark"] .center-switcher-option[data-center="business"] svg { color: #72b5ff; }
+.center-switcher-option[data-center="business"] svg { color: #0d9488; }
+:root[data-theme="dark"] .center-switcher-option[data-center="business"] svg { color: #5eead4; }
 /* Shared selector palette, independent of each dashboard's page colors. */
 .center-switcher-menu { --ink:#17202a; --line:#e3e8ef; --surface:#fff; --surface-strong:#fff; --surface-muted:#f5f7fa; --soft:#f5f7fa; --brand:#007aff; --brand-soft:#eaf3ff; background:var(--surface-strong); color:var(--ink); font-family:-apple-system,"SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif; line-height:1.5; box-shadow:0 24px 60px rgba(28,28,30,.22); }
 :root[data-theme="dark"] .center-switcher-menu { --ink:#f1f4f8; --line:#343942; --surface:#1d2026; --surface-strong:#1d2026; --surface-muted:#262a31; --soft:#262a31; --brand:#72b5ff; --brand-soft:#23354c; }
