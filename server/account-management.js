@@ -161,6 +161,17 @@ body > .topbar .center-switcher-menu { top: calc(100% + 9px); left: auto; }
 :root[data-theme="dark"] .center-switcher-menu { --ink:#f1f4f8; --line:#343942; --surface:#1d2026; --surface-strong:#1d2026; --surface-muted:#262a31; --soft:#262a31; --brand:#72b5ff; --brand-soft:#23354c; }
 :root[data-theme="dark"] .center-switcher-option[data-management] svg, :root[data-theme="dark"] .center-switcher-option[data-center="accounts"] svg { color:#a1a1aa; }
 :root[data-theme="dark"] .center-switcher-trigger > svg:first-child { color:#a1a1aa; }
+
+      /* Match business-data heading typography and vertical spacing. */
+      .page { padding-top: 0; }
+      .hero { min-height: 0; margin-top: 0; margin-bottom: 0; padding-top: 42px; padding-bottom: 27px; }
+      .hero h1 { margin: 0; font-size: 34px; line-height: 1.2; letter-spacing: -1.3px; font-weight: 700; }
+      .hero p { margin: 12px 0 0; font-size: 13px; line-height: 1.5; }
+      @media (max-width: 650px) {
+        .hero { padding-top: 24px; padding-bottom: 19px; }
+        .hero h1 { font-size: 27px; letter-spacing: -.9px; }
+        .hero p { margin-top: 8px; font-size: 11px; }
+      }
 </style></head><body><nav class="topbar" aria-label="账号中心导航"><div class="center-switcher" id="centerSwitcher"><button class="center-switcher-trigger" id="centerSwitcherTrigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="centerSwitcherMenu">${centerIcons.accounts}<span>账号管理</span><svg class="center-switcher-chevron" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 7 5 5 5-5"/></svg></button><div class="center-switcher-menu" id="centerSwitcherMenu" role="menu" hidden>${centerOptions}<a class="center-switcher-option" data-center="accounts" role="menuitem" href="/auth/accounts" aria-current="page">${centerIcons.accounts}<span>账号管理</span><span class="center-switcher-check" aria-hidden="true">✓</span></a></div></div><div class="topbar-actions"><button class="icon-button" id="themeToggle" type="button" aria-label="切换到深色模式" aria-pressed="false"><span id="themeIcon" aria-hidden="true">🌙</span></button><form action="/logout" method="post">${hidden("returnTo", "/auth/accounts")}<button class="logout-button" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5M15 8l4 4-4 4M19 12H9"/></svg><span>退出登录</span></button></form></div></nav><button class="center-switcher-backdrop" id="centerSwitcherBackdrop" type="button" aria-label="关闭后台选择列表" hidden></button>
     <div class="page">
   <header class="hero"><h1>账号管理</h1><p>统一维护登录身份、后台权限和数据范围。每项授权都会实时显示最终生效结果。</p></header>${message ? `<p role="status" class="notice">${escapeHtml(message)}</p>` : ""}
