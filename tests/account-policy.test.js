@@ -121,3 +121,15 @@ test("monthly reports require an explicit permission and retain the existing vie
   assert.throws(() => normalizeManagedAccess({ ...body, viewChannels: [] }), /empty-view-scope/);
   assert.deepEqual(normalizeManagedAccess({ ...body, role: "admin", permissions: ["report:view"] }).permissions, ["report:view"]);
 });
+
+
+test("operating data editing is separately granted and requires monthly viewing", () => {
+  const body = { accountId: "operating-editor", app: "expense", enabled: "1", role: "partner", ownership: "any", viewChannels: ["reimbursement_fuzzy", "reimbursement_fuzzy_manager"], permissions: ["report:view", "report:monthly:view", "report:operating:edit"] };
+  const access = normalizeManagedAccess(body);
+  assert.ok(access.permissions.includes("report:operating:edit"));
+  assert.ok(!access.permissions.includes("report:edit"));
+  assert.throws(() => normalizeManagedAccess({ ...body, permissions: ["report:view", "report:operating:edit"] }), /missing-permission-dependency/);
+  assert.throws(() => normalizeManagedAccess({ ...body, permissions: ["report:monthly:view", "report:operating:edit"] }), /missing-permission-dependency/);
+  const existing = normalizeManagedAccess({ ...body, role: "admin", permissions: ["report:view", "report:monthly:view", "report:edit"] });
+  assert.ok(!existing.permissions.includes("report:operating:edit"));
+});
