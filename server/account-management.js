@@ -119,7 +119,7 @@ function auditDetails(row) {
   return "";
 }
 
-function managementPage({ accounts, selected, csrf, message, managementAccountIds, destinations, wechatEnabled }) {
+function managementPage({ accounts, selected, csrf, message, managementAccountIds, destinations, wechatEnabled, displayName }) {
   const people = accounts.listAccounts();
   const account = selected ? accounts.getAccount(selected) : null;
   const wechatLinks = account ? accounts.wechatBindingStatus(account.accountId) : [];
@@ -182,7 +182,10 @@ body::before {
   pointer-events: none;
   background: var(--admin-page-background);
 }
-</style></head><body><nav class="topbar" aria-label="账号中心导航"><div class="center-switcher" id="centerSwitcher"><button class="center-switcher-trigger" id="centerSwitcherTrigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="centerSwitcherMenu">${centerIcons.accounts}<span>账号管理</span><svg class="center-switcher-chevron" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 7 5 5 5-5"/></svg></button><div class="center-switcher-menu" id="centerSwitcherMenu" role="menu" hidden>${centerOptions}<a class="center-switcher-option" data-center="accounts" role="menuitem" href="/auth/accounts" aria-current="page">${centerIcons.accounts}<span>账号管理</span><span class="center-switcher-check" aria-hidden="true">✓</span></a></div></div><div class="topbar-actions"><button class="icon-button" id="themeToggle" type="button" aria-label="切换到深色模式" aria-pressed="false"><span id="themeIcon" aria-hidden="true">🌙</span></button><form action="/logout" method="post">${hidden("returnTo", "/auth/accounts")}<button class="logout-button" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5M15 8l4 4-4 4M19 12H9"/></svg><span>退出登录</span></button></form></div></nav><button class="center-switcher-backdrop" id="centerSwitcherBackdrop" type="button" aria-label="关闭后台选择列表" hidden></button>
+</style>
+<link rel="stylesheet" href="/auth/accounts/user-menu.css">
+<script src="/auth/accounts/user-menu.js" defer></script>
+</head><body><nav class="topbar" aria-label="账号中心导航"><div class="center-switcher" id="centerSwitcher"><button class="center-switcher-trigger" id="centerSwitcherTrigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="centerSwitcherMenu">${centerIcons.accounts}<span>账号管理</span><svg class="center-switcher-chevron" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 7 5 5 5-5"/></svg></button><div class="center-switcher-menu" id="centerSwitcherMenu" role="menu" hidden>${centerOptions}<a class="center-switcher-option" data-center="accounts" role="menuitem" href="/auth/accounts" aria-current="page">${centerIcons.accounts}<span>账号管理</span><span class="center-switcher-check" aria-hidden="true">✓</span></a></div></div><div class="topbar-actions"><button class="icon-button" id="themeToggle" type="button" aria-label="切换到深色模式" aria-pressed="false"><span id="themeIcon" aria-hidden="true">🌙</span></button><form action="/logout" method="post" data-account-name="${escapeHtml(displayName)}">${hidden("returnTo", "/auth/accounts")}<button class="logout-button" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5M15 8l4 4-4 4M19 12H9"/></svg><span>退出登录</span></button></form></div></nav><button class="center-switcher-backdrop" id="centerSwitcherBackdrop" type="button" aria-label="关闭后台选择列表" hidden></button>
     <div class="page">
   <header class="hero"><h1>账号管理</h1><p>统一维护登录身份、后台权限和数据范围。每项授权都会实时显示最终生效结果。</p></header>${message ? `<p role="status" class="notice">${escapeHtml(message)}</p>` : ""}
   <main><div class="layout"><aside class="sidebar"><section class="card"><div class="card-heading"><h2>账号列表</h2><span class="count-badge">${people.length}</span></div><div class="people">${people.map((person) => `<a href="/auth/accounts?account=${encodeURIComponent(person.accountId)}" ${person.accountId === selected ? 'aria-current="page"' : ""}><span class="person-name"><span>${escapeHtml(person.displayName)}</span><span class="status-badge ${person.enabled ? "" : "off"}">${person.enabled ? "启用" : "停用"}</span></span><small>${escapeHtml(person.username)}</small></a>`).join("")}</div></section>
@@ -232,6 +235,7 @@ export function installAccountManagement({ app, config, accounts, sessions }) {
       return response.status(403).type("text").send("无账号管理权限或登录已失效，请重新登录。");
     }
     response.locals.actor = identity.account.accountId;
+    response.locals.displayName = identity.account.displayName || "";
     response.locals.csrf = csrfFor(token);
     response.locals.destinations = Object.fromEntries(Object.keys(APP_DEFINITIONS).flatMap((appName) => {
       const authorization = sessions.resolve(token, appName);
@@ -243,8 +247,8 @@ export function installAccountManagement({ app, config, accounts, sessions }) {
   app.use("/auth/accounts", guard);
   app.get("/auth/accounts/ui.js", (_request, response) => response.type("application/javascript").send(managementScript()));
   const renderPage = (response, selected, message = "") => {
-    response.set("Content-Security-Policy", `default-src 'none'; style-src 'unsafe-inline'; script-src 'self' 'sha256-${ACCOUNT_THEME_HASH}'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`);
-    response.type("html").send(managementPage({ accounts, selected, csrf: response.locals.csrf, message, managementAccountIds, destinations: response.locals.destinations, wechatEnabled: config.wechat?.enabled === true }));
+    response.set("Content-Security-Policy", `default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self' 'sha256-${ACCOUNT_THEME_HASH}'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`);
+    response.type("html").send(managementPage({ accounts, selected, displayName: response.locals.displayName, csrf: response.locals.csrf, message, managementAccountIds, destinations: response.locals.destinations, wechatEnabled: config.wechat?.enabled === true }));
   };
   app.get("/auth/accounts", (request, response) => renderPage(
     response,

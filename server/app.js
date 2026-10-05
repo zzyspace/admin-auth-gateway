@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { WechatFlowError } from './wechat-store.js';
 import { installWechatLogin } from './wechat-login.js';
 import { installAccountManagement } from "./account-management.js";
@@ -100,6 +101,13 @@ export function createApp({ config, database, accounts, now = Date.now, exchange
   app.disable("x-powered-by");
   app.set("trust proxy", "loopback");
   app.use(noStore);
+  // Public, non-sensitive UI assets shared by the authenticated dashboards.
+  for (const filename of ["user-menu.js", "user-menu.css"]) {
+    app.get(`/auth/accounts/${filename}`, (_request, response) => {
+      response.sendFile(fileURLToPath(new URL(`../public/${filename}`, import.meta.url)));
+    });
+  }
+
   app.use(["/login", "/admin-login"], (_request, response, next) => {
     response.set("Content-Security-Policy", `default-src 'none'; style-src 'unsafe-inline'; script-src 'sha256-${LOGIN_THEME_SCRIPT_HASH}'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`);
     next();
@@ -250,13 +258,14 @@ export function createApp({ config, database, accounts, now = Date.now, exchange
         }
       }
     }
+    const identity = unified ? sessions.resolveIdentity(token) : null;
     const canManageAccounts = unified && Boolean(sessions.resolve(token, "accounts"));
     if (Object.keys(scopes).length === 0 && !canManageAccounts &&
         !(unified && sessions.resolveIdentity(token))) {
       response.status(401).json({ success: false, error: { message: "登录已失效。" } });
       return;
     }
-    response.status(200).json({ success: true, scopes, canManageAccounts, destinations: unified ? destinations : {
+    response.status(200).json({ success: true, account: identity ? { displayName: identity.displayName || "" } : null, scopes, canManageAccounts, destinations: unified ? destinations : {
       invoice: "/invoice", staff: "/staff", expense: "/expense",
     }, apps: unified ? Object.keys(destinations) : [
       ...(scopes.invoice ? ["invoice", "staff"] : []), ...(scopes.reimbursement ? ["expense"] : []),

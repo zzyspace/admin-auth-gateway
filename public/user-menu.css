@@ -1,0 +1,61 @@
+/* Shared account control; keep this independent of each dashboard's button rules. */
+.topbar .account-menu {
+  --account-ink:#17202a; --account-muted:#697483; --account-surface:#fff;
+  --account-border:#e3e8ef; --account-hover:#f5f7fa; --account-control:rgba(255,255,255,.72);
+  --account-danger:#d93025;
+  position:relative; flex:0 1 auto; min-width:0; color:var(--account-ink);
+  font-family:-apple-system,"SF Pro Text","PingFang SC","Noto Sans SC",sans-serif;
+}
+:root[data-theme="dark"] .topbar .account-menu {
+  --account-ink:#f1f4f8; --account-muted:#a4adba; --account-surface:#1d2026;
+  --account-border:#343942; --account-hover:#292e37; --account-control:rgba(41,51,66,.82);
+  --account-danger:#ff8078;
+}
+.topbar:has(.account-menu[data-open]) { z-index:60; }
+.topbar .account-menu[hidden], .topbar .account-menu-panel[hidden] { display:none !important; }
+.topbar .account-menu .account-menu-trigger {
+  display:flex; align-items:center; justify-content:center; gap:7px;
+  min-width:0; width:auto; min-height:36px; margin:0; padding:0 11px;
+  border:1px solid transparent; border-radius:10px; background:var(--account-control);
+  color:var(--account-ink); font:inherit; font-size:14px; font-weight:600; line-height:1.4;
+  box-shadow:none; cursor:pointer; white-space:nowrap; touch-action:manipulation;
+}
+.topbar .account-menu-name { display:block; max-width:10em; overflow:hidden; text-overflow:ellipsis; }
+.topbar .account-menu[data-open] .account-menu-trigger { background:var(--account-hover); border-color:var(--account-border); }
+.topbar .account-menu-panel {
+  position:absolute; z-index:1; top:calc(100% + 8px); right:0; width:168px;
+  max-width:calc(100vw - 24px); padding:6px; border:1px solid var(--account-border);
+  border-radius:14px; background:var(--account-surface); color:var(--account-ink);
+  box-shadow:0 12px 32px rgba(28,28,30,.16); animation:account-menu-enter 130ms ease-out;
+}
+.topbar .account-menu-panel form { display:block; width:100%; margin:0; padding:0; }
+.topbar .account-menu-panel form[hidden] { display:none; }
+.topbar .account-menu .account-menu-panel button[type="submit"] {
+  display:flex; align-items:center; justify-content:flex-start; gap:10px; width:100%; min-width:0;
+  min-height:44px; height:auto; padding:10px 12px; margin:0; border:0; border-radius:9px;
+  background:transparent; color:var(--account-ink); box-shadow:none;
+  font:inherit; font-size:14px; font-weight:500; line-height:1.4; cursor:pointer; white-space:nowrap;
+}
+.topbar .account-menu .account-menu-panel button[type="submit"] svg { display:block; flex:none; width:18px; height:18px; color:var(--account-muted); }
+.topbar .account-menu .account-menu-panel button[type="submit"] span { display:inline; }
+.topbar .account-menu button:focus-visible { outline:2px solid var(--brand,#007aff); outline-offset:2px; }
+@media (hover:hover) and (pointer:fine) {
+  .topbar .account-menu .account-menu-trigger:hover { background:var(--account-hover); }
+  .topbar .account-menu .account-menu-panel button[type="submit"]:hover { background:var(--account-hover); color:var(--account-danger); }
+  .topbar .account-menu .account-menu-panel button[type="submit"]:hover svg { color:var(--account-danger); }
+}
+@media (max-width:650px), (pointer:coarse) {
+  .topbar .account-menu .account-menu-trigger { min-height:44px; padding:0 9px; font-size:13px; gap:5px; }
+  .topbar .account-menu-name { max-width:min(7em,24vw); }
+}
+@keyframes account-menu-enter { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+
+@media (prefers-reduced-motion:reduce) { .topbar .account-menu-panel { animation:none; } }
+
+.topbar .topbar-actions:has(.account-menu), .topbar .top-actions:has(.account-menu) { margin-inline-start:auto; }
+/* Keep the report switcher and account control separate on narrow phones. */
+@media (max-width:360px) {
+  .topbar:has(.report-nav-group) { gap:6px; }
+  .topbar:has(.account-menu) .report-nav-group { gap:4px; }
+  .topbar:has(.report-nav-group) .account-menu-name { max-width:3em; }
+}
