@@ -13,6 +13,7 @@ const ALLOWED_RETURN_PATHS = [
   /^\/expense\/?$/,
   /^\/expense\/submit\/?$/,
   /^\/expense\/monthly\/?$/,
+  /^\/expense\/monthly\/summary\/?$/,
   /^\/employee\/portal\/?$/,
   /^\/reimbursement\/?$/,
   /^\/reimbursement\/submit\/?$/,
@@ -20,6 +21,19 @@ const ALLOWED_RETURN_PATHS = [
 
 export function sanitizeReturnTo(value) {
   const candidate = typeof value === "string" ? value : "";
+  // Summary has a separate permission, but shares the expense login session.
+  if (/^\/expense\/monthly\/summary\/?\?/.test(candidate)) {
+    try {
+      const url = new URL(candidate, "https://local.invalid");
+      const allowed = ["store", "year", "currency"];
+      if (url.origin === "https://local.invalid" && !url.hash &&
+          [...url.searchParams.keys()].every(key => allowed.includes(key)) && allowed.every(key => url.searchParams.getAll(key).length <= 1) &&
+          (!url.searchParams.has("store") || ["fuzzy", "peanut", "fuzzyqz"].includes(url.searchParams.get("store"))) &&
+          (!url.searchParams.has("year") || /^(all|(19|20|21)\d{2})$/.test(url.searchParams.get("year"))) &&
+          (!url.searchParams.has("currency") || /^[A-Z]{3}$/.test(url.searchParams.get("currency")) || url.searchParams.get("currency") === "未标注币种")) return `${url.pathname}${url.search}`;
+    } catch {}
+    return "/expense/monthly/summary";
+  }
   // Preserve only the report's known filters; never accept arbitrary destinations or queries.
   if (/^\/expense\/monthly\/?\?/.test(candidate)) {
     try {

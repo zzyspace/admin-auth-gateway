@@ -133,3 +133,14 @@ test("operating data editing is separately granted and requires monthly viewing"
   const existing = normalizeManagedAccess({ ...body, role: "admin", permissions: ["report:view", "report:monthly:view", "report:edit"] });
   assert.ok(!existing.permissions.includes("report:operating:edit"));
 });
+
+
+test("operating summary viewing is independent of monthly viewing and editing", () => {
+  const body = { accountId: "summary-viewer", app: "expense", enabled: "1", role: "partner", ownership: "any", viewChannels: ["reimbursement_fuzzy", "reimbursement_fuzzy_manager"], permissions: ["report:view", "report:operating:summary:view"] };
+  const access = normalizeManagedAccess(body);
+  assert.ok(access.permissions.includes("report:operating:summary:view"));
+  assert.ok(!access.permissions.includes("report:monthly:view"));
+  assert.ok(!access.permissions.includes("report:operating:edit"));
+  assert.throws(() => normalizeManagedAccess({ ...body, permissions: ["report:operating:summary:view"] }), /missing-permission-dependency/);
+  assert.ok(!normalizeManagedAccess({ ...body, role: "admin", permissions: ["report:view", "report:monthly:view"] }).permissions.includes("report:operating:summary:view"));
+});

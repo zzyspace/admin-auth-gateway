@@ -20,3 +20,14 @@ test('monthly report login preserves its route and only its supported filters', 
   for (const route of ['/expense/monthly?redirect=https://example.com','/expense/monthly?month=2026-13','/expense/monthly?store=unknown','/expense/monthly?month=2026-09&month=2026-08']) assert.equal(sanitizeReturnTo(route),'/expense/monthly');
   assert.equal(sanitizeReturnTo('https://example.com/expense/monthly'),'/invoice');
 });
+
+
+test("operating summary login preserves only exact path and validated filters", () => {
+  assert.equal(sanitizeReturnTo("/expense/monthly/summary"), "/expense/monthly/summary");
+  const route = "/expense/monthly/summary?store=fuzzy&year=2026&currency=CNY";
+  assert.equal(sanitizeReturnTo(route), route);
+  assert.equal(scopeForReturnTo(route, "unified"), "expense");
+  assert.equal(sanitizeReturnTo("/expense/monthly/summary?year=all"), "/expense/monthly/summary?year=all");
+  for (const query of ["year=2026&year=2025", "year=1800", "currency=CNY&currency=USD", "store=unknown", "next=https://evil.test", "year=2026#bad"]) assert.equal(sanitizeReturnTo("/expense/monthly/summary?" + query), "/expense/monthly/summary");
+  assert.notEqual(sanitizeReturnTo("/expense/monthly/summary-evil"), "/expense/monthly/summary-evil");
+});
