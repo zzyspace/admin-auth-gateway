@@ -15,6 +15,12 @@ release_test() {
   run_isolated node --test tests/*.test.js
 }
 
+release_backup() {
+  # /var/lib/admin-auth-gateway is the systemd DynamicUser state directory.
+  backup_sqlite /var/lib/admin-auth-gateway/accounts.db
+  backup_sqlite /var/lib/admin-auth-gateway/sessions.db
+}
+
 release_verify() {
   expect_status http://127.0.0.1:8790/login 200
   expect_status http://127.0.0.1:8790/auth/api/session 401
