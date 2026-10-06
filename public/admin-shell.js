@@ -26,14 +26,18 @@
   ];
   const ACCOUNTS = { id: "accounts", label: "账号管理", href: "/auth/accounts",
     icon: '<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9.5" r="4.25" fill="currentColor" fill-opacity=".16"/><path d="M4.5 25.5c.65-5.8 3.15-8.5 7.5-8.5 3.25 0 5.45 1.5 6.65 4.55"/><circle cx="23.25" cy="22.75" r="3.25" fill="currentColor" fill-opacity=".16"/><path d="M23.25 17.5v1.15M23.25 26.85V28M18 22.75h1.15M27.35 22.75h1.15M19.55 19.05l.8.8M26.15 25.65l.8.8M26.95 19.05l-.8.8M20.35 25.65l-.8.8"/><circle cx="23.25" cy="22.75" r="1.05" fill="currentColor" stroke="none"/></svg>' };
+  // The workbench (/mini.html) is the entry to every center, not a center itself: brand mode only.
+  const WORKBENCH = { id: "workbench", label: "Workbench", href: "/mini.html",
+    icon: '<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="2.5"/><rect x="18" y="5" width="9" height="9" rx="2.5" fill="currentColor" fill-opacity=".16"/><rect x="5" y="18" width="9" height="9" rx="2.5" fill="currentColor" fill-opacity=".16"/><rect x="18" y="18" width="9" height="9" rx="2.5"/></svg>' };
   const CHEVRON = '<svg class="center-switcher-chevron" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" hidden><path d="m5 7 5 5 5-5"></path></svg>';
   const LOGOUT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5M15 8l4 4-4 4M19 12H9"></path></svg>';
 
   const nav = document.querySelector("nav.topbar[data-admin-center]");
   if (!nav) return;
-  const current = [...CENTERS, ACCOUNTS].find(center => center.id === nav.dataset.adminCenter);
+  const current = [...CENTERS, ACCOUNTS, WORKBENCH].find(center => center.id === nav.dataset.adminCenter);
   if (!current) throw new Error(`Unknown admin center: ${nav.dataset.adminCenter}`);
   const brandMode = nav.dataset.adminMode === "brand";
+  if (current === WORKBENCH && !brandMode) throw new Error('The workbench needs data-admin-mode="brand"');
   const element = (tag, attributes = {}, html = "") => {
     const node = document.createElement(tag);
     for (const [name, value] of Object.entries(attributes)) {

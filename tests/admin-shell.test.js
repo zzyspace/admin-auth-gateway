@@ -82,7 +82,11 @@ test('page-specific top bar content is moved, not copied, around the shared cont
   assert.match(shellJs, /element\("span", \{ class: "topbar-divider", "aria-hidden": "true" \}\), \.\.\.slot\.childNodes/);
   assert.match(shellJs, /const brandMode = nav\.dataset\.adminMode === "brand"/);
   assert.match(shellJs, /if \(brandMode\) return;/);
-  assert.match(shellJs, /\[\.\.\.CENTERS, ACCOUNTS\]\.find\(center => center\.id === nav\.dataset\.adminCenter\)/);
+  assert.match(shellJs, /\[\.\.\.CENTERS, ACCOUNTS, WORKBENCH\]\.find\(center => center\.id === nav\.dataset\.adminCenter\)/);
+  // The workbench is never a center in the switcher, only a brand link back to /mini.html.
+  assert.match(shellJs, /const WORKBENCH = \{ id: "workbench", label: "Workbench", href: "\/mini\.html",/);
+  assert.match(shellJs, /if \(current === WORKBENCH && !brandMode\) throw/);
+  assert.match(shellCss, /\[data-center="workbench"\] \{ --center-color:#007aff; \}/);
   for (const selector of ['.center-brand', '.topbar-start', '.topbar-divider', '.report-switcher-trigger', '.report-switcher-menu', '.report-switcher-option']) {
     assert.ok(shellCss.includes(`${selector} {`), selector);
   }
@@ -93,7 +97,7 @@ test('the page background is defined once, in the shell, and no admin page overr
   assert.match(shellCss, /body::before \{ content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; background:var\(--admin-page-background\); \}/);
   const root = new URL('../../', import.meta.url);
   const pages = ['admin-auth-gateway/server/account-management.js', 'business-data/public/assets/style.css', 'employee-information/public/portal.html',
-    'invoice-submit/public/admin.html', 'store-management/public/assets/style.css', 'wechat-claw/src/admin/public/admin.html', 'wechat-claw/src/admin/public/submit.html',
+    'invoice-submit/public/admin.html', 'invoice-submit/mini.html', 'store-management/public/assets/style.css', 'wechat-claw/src/admin/public/admin.html', 'wechat-claw/src/admin/public/submit.html',
     'wechat-claw/src/admin/public/monthly/styles.css', 'wechat-claw/src/admin/public/operating/styles.css', 'wechat-claw/src/admin/public/operating-summary/styles.css'];
   for (const page of pages) {
     const file = new URL(page, root);

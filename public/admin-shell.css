@@ -82,6 +82,8 @@ body.switcher-open > .topbar { z-index:21; }
 :root[data-theme="dark"] [data-center="store"] { --center-color:#f486ad; }
 :root[data-theme="dark"] [data-management] { --center-color:#a1a1aa; }
 
+[data-center="workbench"] { --center-color:#007aff; }
+:root[data-theme="dark"] [data-center="workbench"] { --center-color:#5aa7ff; }
 [data-center="accounts"] { --center-color:#8e8e93; }
 :root[data-theme="dark"] [data-center="accounts"] { --center-color:#a1a1aa; }
 
