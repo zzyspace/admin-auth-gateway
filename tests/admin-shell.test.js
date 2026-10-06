@@ -60,6 +60,11 @@ test('the shell keeps the contract user-menu.js and pages rely on', () => {
   for (const id of ['center-switcher', 'center-trigger', 'center-menu', 'menu-backdrop', 'theme-toggle', 'logout']) assert.match(shellJs, new RegExp(`id: "${id}"|id="${id}"`), id);
   assert.match(themeJs, /"comeover-admin-theme"/);
   assert.match(themeJs, /querySelector\("#theme-toggle"\)/);
+  // Pages that redraw on theme changes (the monthly report) rely on this event, sent only on a real change.
+  assert.match(themeJs, /changed = document\.documentElement\.dataset\.theme !== value/);
+  assert.match(themeJs, /if \(changed\) document\.dispatchEvent\(new CustomEvent\("admin-themechange", \{ detail: \{ theme: value \} \}\)\)/);
+  // A fixed toggle size, so page-level button rules cannot make it differ between admins.
+  assert.match(shellCss, /\.theme-toggle \{ width:44px; height:44px; min-height:44px; padding:0; border:0;/);
 });
 
 test('the shell stylesheet defines every custom property it uses', () => {

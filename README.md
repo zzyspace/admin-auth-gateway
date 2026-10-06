@@ -170,9 +170,9 @@ reference for that historical mode.
 | 子元素 `<div data-admin-actions>…</div>` | 其中节点放在主题按钮前 | 报表页的「返回后台」 |
 | `data-account-name` | 直接交给 `user-menu.js`，不再额外请求 | 账号管理页 |
 
-二级下拉（`.report-switcher*`）的样式也由外壳提供，交互逻辑仍在各页面。渲染后的元素 ID（`center-trigger`、`center-menu`、`menu-backdrop`、`theme-toggle`、`logout`）与原各后台一致。显示入口只是导航，不授予任何访问权限。
+二级下拉（`.report-switcher*`）的样式也由外壳提供，交互逻辑仍在各页面。主题由 `admin-theme.js` 统一保存和切换；主题真正变化时它会在 `document` 上发出 `admin-themechange` 事件（`detail.theme` 为 `light`/`dark`），需要按主题重画内容的页面（如支出月报）监听它即可，不要自行读写主题存储。渲染后的元素 ID（`center-trigger`、`center-menu`、`menu-backdrop`、`theme-toggle`、`logout`）与原各后台一致。显示入口只是导航，不授予任何访问权限。
 
-接入顺序：先部署带有外壳文件的网关，再部署接入的后台；接入后台的 `release_prepare` 会先确认线上网关已提供这三个文件。已接入：`business-data`、`employee-information`、`invoice-submit`（`/invoice` 后台）、`store-management`、`wechat-claw`（`/expense` 主后台和 `/expense/submit` 提交页）。尚未接入：报账月度/经营报表页、网关账号管理页。
+接入顺序：先部署带有外壳文件的网关，再部署接入的后台；接入后台的 `release_prepare` 会先确认线上网关已提供这三个文件。已接入全部后台：`business-data`、`employee-information`、`invoice-submit`（`/invoice` 后台）、`store-management`、`wechat-claw`（`/expense` 主后台、`/expense/submit` 提交页、`/expense/monthly` 三个报表页），以及网关自己的账号管理页 `/auth/accounts`。
 
 ## Credential changes
 

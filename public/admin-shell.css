@@ -39,7 +39,8 @@ body.switcher-open > .topbar { z-index:21; }
 
 .topbar-actions { display:flex; align-items:center; gap:6px; }
 .theme-toggle,.logout { display:flex; align-items:center; justify-content:center; border-radius:10px; background:var(--header-control-bg); }
-.theme-toggle { width:44px; font-size:18px; }
+/* Fixed size and no border, whatever the page's own button styles say. */
+.theme-toggle { width:44px; height:44px; min-height:44px; padding:0; border:0; font-size:18px; }
 .logout { gap:7px; padding:0 12px; font-size:13px; }
 .logout svg { width:17px; height:17px; }
 .logout-form { margin:0; }

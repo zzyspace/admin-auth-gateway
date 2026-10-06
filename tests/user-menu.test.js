@@ -34,8 +34,7 @@ test('shared user menu assets are public but identity stays session-protected', 
   const page=await fetch(base+'/auth/accounts?account=worker',{headers});
   const html=await page.text();
   assert.match(html,/data-account-name="林小雨 &lt;测试&gt;"/); // Current actor, not selected account.
-  assert.match(html,/action="\/logout" method="post"/);
-  assert.match(html,/name="returnTo" value="\/auth\/accounts"/);
+  assert.match(html,/data-admin-center="accounts" data-return-to="\/auth\/accounts"/); // admin-shell.js renders the logout form.
   assert.match(page.headers.get('content-security-policy'),/style-src 'self' 'unsafe-inline'/);
   const workerToken=sessions.login('worker-login','fixture-password').token;
   assert.deepEqual((await (await fetch(base+'/auth/api/session',{headers:{Cookie:`admin_session=${workerToken}`}})).json()).account,{displayName:'陈晓明'});

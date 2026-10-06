@@ -5,15 +5,16 @@
   const key = "comeover-admin-theme", media = matchMedia("(prefers-color-scheme: dark)");
   const valid = value => value === "light" || value === "dark";
   // Per-admin keys predate the shared key; they are read only as a fallback and never written.
-  const legacyKeys = ["employee-portal-theme", "invoice-admin-theme", "reimbursement-admin-theme", "store-management-theme"];
+  const legacyKeys = ["employee-portal-theme", "invoice-admin-theme", "reimbursement-admin-theme", "store-management-theme", "account-management-theme"];
   const saved = () => {
     try {
       for (const name of [key, ...legacyKeys]) { const value = localStorage.getItem(name); if (valid(value)) return value; }
     } catch {}
     return null;
   };
+  // Pages that draw theme-dependent content (e.g. charts) listen for "admin-themechange".
   const apply = value => {
-    const dark = value === "dark";
+    const dark = value === "dark", changed = document.documentElement.dataset.theme !== value;
     document.documentElement.dataset.theme = value;
     document.documentElement.style.colorScheme = value;
     const meta = document.querySelector('meta[name="theme-color"]');
@@ -25,6 +26,7 @@
       const icon = document.querySelector("#theme-icon");
       if (icon) icon.textContent = dark ? "☀️" : "🌙";
     }
+    if (changed) document.dispatchEvent(new CustomEvent("admin-themechange", { detail: { theme: value } }));
   };
   const preferred = () => valid(saved()) ? saved() : media.matches ? "dark" : "light";
   apply(preferred());

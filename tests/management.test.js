@@ -27,10 +27,11 @@ test("management is explicit, supports isolated management login and protects al
   assert.equal(page.status, 200);
   const html = await page.text();
   assert.doesNotMatch(html, /fixture-password/);
-  const themeScript = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
-  assert.ok(themeScript);
-  const themeHash = createHash("sha256").update(themeScript).digest("base64");
-  assert.ok(page.headers.get("content-security-policy")?.includes(`'sha256-${themeHash}'`));
+  // The top bar comes from the shared shell; no inline scripts, and the shell may load the session.
+  assert.doesNotMatch(html, /<script>/);
+  assert.match(html, /<nav class="topbar" aria-label="账号中心导航" data-admin-center="accounts" data-return-to="\/auth\/accounts" data-account-name="[^"]*"><\/nav>/);
+  assert.match(html, /<script src="\/auth\/accounts\/admin-shell\.js" defer><\/script>\s*<script src="\/auth\/accounts\/user-menu\.js" defer><\/script>/);
+  assert.match(page.headers.get("content-security-policy"), /script-src 'self'; connect-src 'self';/);
   const csrf = html.match(/name="csrf" value="([^"]+)"/)[1];
   const post = (action, body, extra = {}) => {
     const form = new URLSearchParams({ csrf });
