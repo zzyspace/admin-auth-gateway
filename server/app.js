@@ -102,7 +102,7 @@ export function createApp({ config, database, accounts, now = Date.now, exchange
   app.set("trust proxy", "loopback");
   app.use(noStore);
   // Public, non-sensitive UI assets shared by the authenticated dashboards.
-  for (const filename of ["user-menu.js", "user-menu.css"]) {
+  for (const filename of ["user-menu.js", "user-menu.css", "admin-shell.js", "admin-shell.css", "admin-theme.js"]) {
     app.get(`/auth/accounts/${filename}`, (_request, response) => {
       response.sendFile(fileURLToPath(new URL(`../public/${filename}`, import.meta.url)));
     });

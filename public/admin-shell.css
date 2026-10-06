@@ -1,0 +1,83 @@
+/* Shared admin top bar (center switcher, theme toggle, logout), served at /auth/accounts/admin-shell.css.
+   Self-contained: it defines its own palette on .topbar and does not rely on page tokens or resets.
+   Base rules use :where() so they carry no specificity over the component rules below. */
+
+:where(.topbar, .topbar *, .center-switcher-backdrop) { box-sizing:border-box; }
+:where(.topbar) button { font:inherit; color:inherit; cursor:pointer; border:0; background:transparent; -webkit-user-select:none; user-select:none; min-height:44px; touch-action:manipulation; }
+:where(.topbar) a { touch-action:manipulation; }
+:where(.topbar) button:active:not(:disabled) { transform:translateY(1px); }
+:where(.topbar) button:focus-visible { outline:3px solid var(--brand); outline-offset:3px; }
+:where(.topbar) svg { width:20px; height:20px; flex-shrink:0; }
+:where(.topbar) [hidden], .center-switcher-backdrop[hidden] { display:none !important; }
+
+.topbar {
+  --header:#fff; --header-ink:#17202a; --header-line:#e3e8ef;
+  --header-control-bg:rgba(255,255,255,.72); --header-control-hover:rgba(255,255,255,.56);
+  --surface-strong:#fff; --surface-muted:#f5f7fa; --ink:#17202a; --muted:#697483; --line:#e3e8ef; --brand:#007aff; --brand-soft:#eaf3ff;
+  min-height:65px; padding:10px max(18px,env(safe-area-inset-left)); padding-top:max(10px,env(safe-area-inset-top));
+  display:flex; align-items:center; gap:16px; justify-content:space-between;
+  background:var(--header); color:var(--header-ink); border-bottom:1px solid var(--header-line); position:relative; z-index:5;
+  font-family:-apple-system,"SF Pro Text","PingFang SC","Noto Sans SC",sans-serif; font-size:14px; line-height:normal; -webkit-font-smoothing:antialiased;
+}
+:root[data-theme="dark"] .topbar {
+  --header:#1d2026; --header-ink:#f1f4f8; --header-line:#343942;
+  --header-control-bg:rgba(41,51,66,.82); --header-control-hover:rgba(73,91,116,.32);
+  --surface-strong:#1d2026; --surface-muted:#262a31; --ink:#f1f4f8; --muted:#a4adba; --line:#343942; --brand:#72b5ff; --brand-soft:#23354c;
+}
+body.switcher-open { overflow:hidden; }
+body.switcher-open > .topbar { z-index:21; }
+
+.center-switcher { position:static; z-index:22; }
+.center-switcher-trigger { display:inline-flex; align-items:center; gap:8px; min-height:36px; padding:0 7px; border:0; border-radius:10px; background:transparent; color:var(--ink); font-size:15px; font-weight:700; }
+.center-switcher-trigger:disabled { color:var(--ink); opacity:1; cursor:default; -webkit-text-fill-color:var(--ink); }
+.center-switcher-trigger .center-icon { width:22px; height:22px; color:var(--center-color); }
+.center-switcher-chevron { width:15px; height:15px; transition:transform .18s ease; }
+.center-switcher-chevron[hidden] { display:none; }
+.center-switcher.is-open .center-switcher-chevron { transform:rotate(180deg); }
+
+.topbar-actions { display:flex; align-items:center; gap:6px; }
+.theme-toggle,.logout { display:flex; align-items:center; justify-content:center; border-radius:10px; background:var(--header-control-bg); }
+.theme-toggle { width:44px; font-size:18px; }
+.logout { gap:7px; padding:0 12px; font-size:13px; }
+.logout svg { width:17px; height:17px; }
+.logout-form { margin:0; }
+
+/* The selector keeps its own palette, independent of each dashboard's page colors. */
+.center-switcher-menu {
+  --ink:#17202a; --line:#e3e8ef; --surface:#fff; --surface-strong:#fff; --surface-muted:#f5f7fa; --soft:#f5f7fa; --brand:#007aff; --brand-soft:#eaf3ff;
+  position:absolute; z-index:22; top:calc(100% + 9px); left:auto; width:min(286px,calc(100vw - 32px)); padding:8px;
+  border:1px solid var(--line); border-radius:20px; background:var(--surface-strong); color:var(--ink);
+  font-family:-apple-system,"SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif; line-height:1.5; box-shadow:0 24px 60px rgba(28,28,30,.22);
+}
+:root[data-theme="dark"] .center-switcher-menu { --ink:#f1f4f8; --line:#343942; --surface:#1d2026; --surface-strong:#1d2026; --surface-muted:#262a31; --soft:#262a31; --brand:#72b5ff; --brand-soft:#23354c; }
+.center-switcher-option { display:grid; grid-template-columns:30px 1fr 20px; align-items:center; gap:12px; min-height:62px; padding:0 14px; border-radius:14px; color:var(--ink); font-size:16px; font-weight:650; text-decoration:none; }
+.center-switcher-option[aria-current="page"] { background:var(--brand-soft); }
+.center-switcher-option svg { width:27px; height:27px; color:var(--center-color); }
+.center-switcher-check { color:var(--brand); font-size:22px; font-weight:800; text-align:center; }
+.center-switcher-backdrop { position:fixed; z-index:20; inset:0; border:0; background:rgba(28,28,30,.28); backdrop-filter:blur(2px); cursor:default; }
+
+/* One color per center, used by the trigger icon and the menu option. */
+[data-center="business"] { --center-color:#a78bfa; }
+[data-center="expense"] { --center-color:#3478f6; }
+[data-center="invoice"] { --center-color:#34b978; }
+[data-center="staff"] { --center-color:#f0a52b; }
+[data-center="store"] { --center-color:#e85d8e; }
+[data-management] { --center-color:#8e8e93; }
+:root[data-theme="dark"] [data-center="store"] { --center-color:#f486ad; }
+:root[data-theme="dark"] [data-management] { --center-color:#a1a1aa; }
+
+@media(hover:hover) and (pointer:fine) {
+  .center-switcher-trigger:not(:disabled):hover,.center-switcher-option:hover { background:var(--surface-muted); }
+  .theme-toggle:hover,.logout:hover { background:var(--header-control-hover); }
+}
+@media(max-width:650px) {
+  .topbar { min-height:61px; padding:8px 12px; padding-top:max(8px,env(safe-area-inset-top)); gap:8px; }
+  .topbar-actions { gap:5px; }
+  .logout { padding:0 8px; font-size:12px; gap:5px; }
+  .theme-toggle { width:40px; }
+}
+@media(max-width:360px) {
+  .topbar { padding-left:10px; padding-right:10px; }
+  .logout { font-size:11px; }
+}
+@media(prefers-reduced-motion:reduce) { .center-switcher-chevron { transition:none; } }

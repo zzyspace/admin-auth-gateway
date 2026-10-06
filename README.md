@@ -136,6 +136,33 @@ deployment script, because `/etc/admin-auth-gateway.env` now carries production
 settings. `deploy/systemd/admin-auth-gateway.http-trial.env` is kept only as a
 reference for that historical mode.
 
+## 共享后台外壳
+
+网关以公开静态文件提供各后台共用的顶栏，与 `user-menu.*` 一样位于 `/auth/accounts/`。源文件只有这一份，改动后部署网关即对所有接入的后台生效：
+
+| 文件 | 作用 | 加载方式 |
+| --- | --- | --- |
+| `public/admin-theme.js` | 读取并应用 `comeover-admin-theme` 深浅主题，提供 `#theme-toggle` 的切换 | `<head>` 中同步加载，避免闪烁 |
+| `public/admin-shell.js` | 渲染后台切换菜单（入口、图标、顺序只在 `CENTERS` 定义一次）、主题按钮和退出表单；按 `/auth/api/session` 的 `apps`、`destinations`、`canManageAccounts` 显示入口 | `defer`，必须在 `user-menu.js` 之前 |
+| `public/admin-shell.css` | 顶栏、菜单、按钮样式，自带配色变量，不依赖页面变量 | 在页面样式之前 |
+
+页面接入方式：
+
+```html
+<link rel="stylesheet" href="/auth/accounts/admin-shell.css">
+<link rel="stylesheet" href="/<页面>/style.css">
+<link rel="stylesheet" href="/auth/accounts/user-menu.css">
+<script src="/auth/accounts/admin-theme.js"></script>
+<script src="/auth/accounts/admin-shell.js" defer></script>
+<script src="/auth/accounts/user-menu.js" defer></script>
+…
+<nav class="topbar" aria-label="后台导航" data-admin-center="business" data-return-to="/business"></nav>
+```
+
+`data-admin-center` 取 `business`、`expense`、`invoice`、`staff`、`store` 之一。渲染后的元素 ID（`center-trigger`、`center-menu`、`menu-backdrop`、`theme-toggle`、`logout`）与原各后台一致。显示入口只是导航，不授予任何访问权限。
+
+接入顺序：先部署带有外壳文件的网关，再部署接入的后台；接入后台的 `release_prepare` 会先确认线上网关已提供这三个文件。已接入：`business-data`。
+
 ## Credential changes
 
 After changing `/etc/invoice-submit.env`, restart:
