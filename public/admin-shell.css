@@ -2,6 +2,19 @@
    Self-contained: it defines its own palette on .topbar and does not rely on page tokens or resets.
    Base rules use :where() so they carry no specificity over the component rules below. */
 
+/* Shared page background: a viewport-fixed gradient behind the page, so it does not stretch with
+   long lists. Pages must not set their own body background. */
+:root {
+  --admin-page-color:#e9edf7;
+  --admin-page-background:radial-gradient(circle at top left,rgba(0,122,255,.16),transparent 28%),radial-gradient(circle at top right,rgba(90,200,250,.18),transparent 26%),linear-gradient(180deg,#f2f2f7 0%,#e9edf7 100%);
+}
+:root[data-theme="dark"] {
+  --admin-page-color:#151b25;
+  --admin-page-background:radial-gradient(circle at top left,rgba(32,110,210,.22),transparent 28%),radial-gradient(circle at top right,rgba(50,170,210,.14),transparent 26%),linear-gradient(180deg,#0d1117 0%,#151b25 100%);
+}
+body { background:var(--admin-page-color); isolation:isolate; }
+body::before { content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; background:var(--admin-page-background); }
+
 :where(.topbar, .topbar *, .center-switcher-backdrop) { box-sizing:border-box; }
 :where(.topbar) button { font:inherit; color:inherit; cursor:pointer; border:0; background:transparent; -webkit-user-select:none; user-select:none; min-height:44px; touch-action:manipulation; }
 :where(.topbar) a { touch-action:manipulation; }
