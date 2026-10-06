@@ -161,7 +161,7 @@ reference for that historical mode.
 
 `data-admin-center` 取 `business`、`expense`、`invoice`、`staff`、`store` 之一。渲染后的元素 ID（`center-trigger`、`center-menu`、`menu-backdrop`、`theme-toggle`、`logout`）与原各后台一致。显示入口只是导航，不授予任何访问权限。
 
-接入顺序：先部署带有外壳文件的网关，再部署接入的后台；接入后台的 `release_prepare` 会先确认线上网关已提供这三个文件。已接入：`business-data`、`employee-information`、`invoice-submit`（`/invoice` 后台）。
+接入顺序：先部署带有外壳文件的网关，再部署接入的后台；接入后台的 `release_prepare` 会先确认线上网关已提供这三个文件。已接入：`business-data`、`employee-information`、`invoice-submit`（`/invoice` 后台）、`wechat-claw`（`/expense` 主后台）。尚未接入（顶栏含页面自有内容，需外壳先支持自定义区域）：`store-management`、报账提交页与月度/经营报表页、网关账号管理页。
 
 ## Credential changes
 
