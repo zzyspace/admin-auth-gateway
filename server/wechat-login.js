@@ -53,7 +53,7 @@ export function installWechatLogin({app,config,accounts,sessions,issueSession,ex
       if(state.needsBinding){
         const csrfToken=randomToken();
         response.cookie('admin_login_csrf',csrfToken,{httpOnly:true,secure:config.cookie.secure,sameSite:'strict',path:'/login',maxAge:300000});
-        response.set('Content-Security-Policy',`default-src 'none'; style-src 'unsafe-inline'; script-src 'sha256-${LOGIN_THEME_SCRIPT_HASH}'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`);
+        response.set('Content-Security-Policy',`default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'sha256-${LOGIN_THEME_SCRIPT_HASH}'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`);
         return response.type('html').send(renderLoginPage({csrfToken,returnTo:'/mini.html',sessionDays:Math.ceil(config.cookie.maxAgeSeconds/86400),bindingFlowId:flowId}));
       }
       const matches=sessions.authorizeAccount(state.account.accountId);

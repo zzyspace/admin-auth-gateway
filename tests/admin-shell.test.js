@@ -29,6 +29,10 @@ test('shared admin shell assets are public and served verbatim', async t => {
     assert.match(response.headers.get('content-type'), type, name);
     assert.equal(await response.text(), read(name), name);
   }
+  // The login page loads admin-shell.css for the shared background.
+  const login = await fetch(`${base}/login?returnTo=%2Fmini.html`);
+  assert.match(login.headers.get('content-security-policy'), /style-src 'self' 'unsafe-inline'/);
+  assert.match(await login.text(), /href="\/auth\/accounts\/admin-shell\.css"/);
 });
 
 test('centers are declared once, in the canonical order and labels', () => {

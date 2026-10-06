@@ -70,7 +70,7 @@ function noStore(_request, response, next) {
   response.set("X-Frame-Options", "DENY");
   response.set(
     "Content-Security-Policy",
-    "default-src 'none'; style-src 'self' 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+    "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
   );
   response.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
   next();
@@ -109,7 +109,7 @@ export function createApp({ config, database, accounts, now = Date.now, exchange
   }
 
   app.use(["/login", "/admin-login"], (_request, response, next) => {
-    response.set("Content-Security-Policy", `default-src 'none'; style-src 'unsafe-inline'; script-src 'sha256-${LOGIN_THEME_SCRIPT_HASH}'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`);
+    response.set("Content-Security-Policy", `default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'sha256-${LOGIN_THEME_SCRIPT_HASH}'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`);
     next();
   });
 
