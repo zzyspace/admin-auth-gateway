@@ -11,16 +11,18 @@
 :where(.topbar) [hidden], .center-switcher-backdrop[hidden] { display:none !important; }
 
 .topbar {
-  --header:#fff; --header-ink:#17202a; --header-line:#e3e8ef;
+  --header:rgba(255,255,255,.84); --header-ink:#17202a; --header-line:rgba(60,60,67,.16);
   --header-control-bg:rgba(255,255,255,.72); --header-control-hover:rgba(255,255,255,.56);
   --surface-strong:#fff; --surface-muted:#f5f7fa; --ink:#17202a; --muted:#697483; --line:#e3e8ef; --brand:#007aff; --brand-soft:#eaf3ff;
-  min-height:65px; padding:10px max(18px,env(safe-area-inset-left)); padding-top:max(10px,env(safe-area-inset-top));
+  /* 64px tall on every width; controls are vertically centered, safe-area inset added on top. */
+  min-height:calc(64px + env(safe-area-inset-top)); padding:env(safe-area-inset-top) max(18px,env(safe-area-inset-right)) 0 max(18px,env(safe-area-inset-left));
   display:flex; align-items:center; gap:16px; justify-content:space-between;
-  background:var(--header); color:var(--header-ink); border-bottom:1px solid var(--header-line); position:relative; z-index:5;
+  background:var(--header); -webkit-backdrop-filter:blur(20px); backdrop-filter:blur(20px);
+  color:var(--header-ink); border-bottom:1px solid var(--header-line); position:relative; z-index:5;
   font-family:-apple-system,"SF Pro Text","PingFang SC","Noto Sans SC",sans-serif; font-size:14px; line-height:normal; -webkit-font-smoothing:antialiased;
 }
 :root[data-theme="dark"] .topbar {
-  --header:#1d2026; --header-ink:#f1f4f8; --header-line:#343942;
+  --header:rgba(27,34,45,.88); --header-ink:#f1f4f8; --header-line:rgba(235,242,255,.14);
   --header-control-bg:rgba(41,51,66,.82); --header-control-hover:rgba(73,91,116,.32);
   --surface-strong:#1d2026; --surface-muted:#262a31; --ink:#f1f4f8; --muted:#a4adba; --line:#343942; --brand:#72b5ff; --brand-soft:#23354c;
 }
@@ -71,7 +73,7 @@ body.switcher-open > .topbar { z-index:21; }
   .theme-toggle:hover,.logout:hover { background:var(--header-control-hover); }
 }
 @media(max-width:650px) {
-  .topbar { min-height:61px; padding:8px 12px; padding-top:max(8px,env(safe-area-inset-top)); gap:8px; }
+  .topbar { padding-left:max(12px,env(safe-area-inset-left)); padding-right:max(12px,env(safe-area-inset-right)); gap:8px; }
   .topbar-actions { gap:5px; }
   .logout { padding:0 8px; font-size:12px; gap:5px; }
   .theme-toggle { width:40px; }
