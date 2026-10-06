@@ -4,7 +4,14 @@
 (() => {
   const key = "comeover-admin-theme", media = matchMedia("(prefers-color-scheme: dark)");
   const valid = value => value === "light" || value === "dark";
-  const saved = () => { try { return localStorage.getItem(key); } catch { return null; } };
+  // Per-admin keys predate the shared key; they are read only as a fallback and never written.
+  const legacyKeys = ["employee-portal-theme", "invoice-admin-theme", "reimbursement-admin-theme", "store-management-theme"];
+  const saved = () => {
+    try {
+      for (const name of [key, ...legacyKeys]) { const value = localStorage.getItem(name); if (valid(value)) return value; }
+    } catch {}
+    return null;
+  };
   const apply = value => {
     const dark = value === "dark";
     document.documentElement.dataset.theme = value;
