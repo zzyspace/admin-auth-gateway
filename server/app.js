@@ -70,7 +70,7 @@ function noStore(_request, response, next) {
   response.set("X-Frame-Options", "DENY");
   response.set(
     "Content-Security-Policy",
-    "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+    "default-src 'none'; style-src 'self' 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
   );
   response.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
   next();

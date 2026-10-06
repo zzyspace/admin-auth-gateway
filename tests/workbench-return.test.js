@@ -10,6 +10,7 @@ test("workbench login allows only the exact local return path", () => {
   const html = renderLoginPage({ returnTo: "/mini.html", csrfToken: "fixture", sessionDays: 30 });
   assert.match(html, /登录后进入工作台/);
   assert.match(html, /name="returnTo" value="\/mini\.html"/);
+  assert.match(html, /<link rel="stylesheet" href="\/auth\/accounts\/admin-shell\.css">/);
 });
 
 test('monthly report login preserves its route and only its supported filters', () => {

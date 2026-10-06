@@ -96,7 +96,7 @@ test('the page background is defined once, in the shell, and no admin page overr
   assert.match(shellCss, /body \{ background:var\(--admin-page-color\); isolation:isolate; \}/);
   assert.match(shellCss, /body::before \{ content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; background:var\(--admin-page-background\); \}/);
   const root = new URL('../../', import.meta.url);
-  const pages = ['admin-auth-gateway/server/account-management.js', 'business-data/public/assets/style.css', 'employee-information/public/portal.html',
+  const pages = ['admin-auth-gateway/server/account-management.js', 'admin-auth-gateway/server/login-page.js', 'business-data/public/assets/style.css', 'employee-information/public/portal.html',
     'invoice-submit/public/admin.html', 'invoice-submit/mini.html', 'store-management/public/assets/style.css', 'wechat-claw/src/admin/public/admin.html', 'wechat-claw/src/admin/public/submit.html',
     'wechat-claw/src/admin/public/monthly/styles.css', 'wechat-claw/src/admin/public/operating/styles.css', 'wechat-claw/src/admin/public/operating-summary/styles.css'];
   for (const page of pages) {
