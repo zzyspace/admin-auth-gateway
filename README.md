@@ -100,31 +100,40 @@ sandbox they may need to be run with local-listen permission.
 ## Production layout
 
 ```text
-/opt/admin-auth-gateway/current
+/opt/admin-auth-gateway/current -> releases/<commit>
+/opt/admin-auth-gateway/releases/<commit>
 /var/lib/admin-auth-gateway/sessions.db
 /etc/systemd/system/admin-auth-gateway.service
 ```
+
+Deploy an exact commit from the comeover monorepo. The SHA is this project's
+published mirror commit (`npm run mirrors` at the monorepo root, or
+`git rev-parse refs/mirrors/admin-auth-gateway`):
+
+```bash
+bash deploy/deploy-admin-auth-gateway.sh <full-commit-SHA>
+```
+
+The script bundles only that commit's history, builds a new release, runs the
+tests as `nobody` without production env, then switches `current`, restarts and
+checks `/health/auth`, `/login` and `/auth/api/session`. Any failure after the
+switch restores the previous release and unit. The server needs no GitHub access.
 
 The systemd service loads both existing credential files. The deployment script
 only manages this service; shared Nginx routes and auth snippets are published by
 the independent `server-infra` project. Files under `deploy/nginx/` are retained
 as migration-era compatibility snapshots and are not installed by this script.
 
-### Temporary HTTP trial
+The script never modifies `/etc/*.env`. `/etc/admin-auth-gateway.env` holds
+server-only settings such as the WeChat AppSecret (see
+`server-infra/deploy/configure-wechat-secret.py`).
 
-Before the domain is ready, the gateway can be exercised using an explicit,
-reversible seven-day HTTP Cookie override:
+### Retired HTTP trial
 
-```bash
-bash deploy/deploy-admin-auth-gateway.sh root@server http-trial
-```
-
-This installs `/etc/admin-auth-gateway.env` with `Secure=false` and cookie name
-`admin_session`. It is not suitable as a long-term public deployment because
-HTTP exposes both login credentials and bearer-like session cookies to network
-observers. After HTTPS is ready, run the deployment in `production` mode; the
-script disables the override and restores the `__Host-admin_session` Secure
-Cookie defaults.
+The pre-HTTPS seven-day non-Secure Cookie trial is no longer installed by the
+deployment script, because `/etc/admin-auth-gateway.env` now carries production
+settings. `deploy/systemd/admin-auth-gateway.http-trial.env` is kept only as a
+reference for that historical mode.
 
 ## Credential changes
 

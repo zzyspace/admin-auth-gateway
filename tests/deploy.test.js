@@ -57,3 +57,18 @@ test("gateway deployment leaves the shared Nginx entry to server-infra", () => {
   assert.doesNotMatch(deployScript, /\bnginx -t\b/);
   assert.doesNotMatch(deployScript, /systemctl reload nginx/);
 });
+
+test("gateway deployment never rewrites server environment files", () => {
+  // /etc/admin-auth-gateway.env holds server-only settings such as the WeChat AppSecret.
+  const deployScript = read("deploy/deploy-admin-auth-gateway.sh");
+  assert.doesNotMatch(deployScript, /\b(mv|cp|rm|install|tee)\b[^\n]*\/etc\/[\w.-]*\.env/);
+  assert.doesNotMatch(deployScript, />\s*\/etc\/[\w.-]*\.env/);
+});
+
+test("gateway deployment switches tested releases with rollback", () => {
+  const deployScript = read("deploy/deploy-admin-auth-gateway.sh");
+  assert.match(deployScript, /releases\/\$expected/);
+  assert.match(deployScript, /runuser -u nobody -- env -i [^\n]*node --test/);
+  assert.match(deployScript, /trap rollback ERR/);
+  assert.match(deployScript, /mv -Tf "\$app_root\/\.current-\$\$" "\$app_root\/current"/);
+});
