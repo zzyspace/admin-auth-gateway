@@ -106,18 +106,19 @@ sandbox they may need to be run with local-listen permission.
 /etc/systemd/system/admin-auth-gateway.service
 ```
 
-Deploy an exact commit from the comeover monorepo. The SHA is this project's
-published mirror commit (`npm run mirrors` at the monorepo root, or
-`git rev-parse refs/mirrors/admin-auth-gateway`):
+Deploy from the comeover monorepo root after publishing the mirror:
 
 ```bash
-bash deploy/deploy-admin-auth-gateway.sh <full-commit-SHA>
+npm run mirrors:push
+npm run deploy -- admin-auth-gateway
 ```
 
-The script bundles only that commit's history, builds a new release, runs the
-tests as `nobody` without production env, then switches `current`, restarts and
-checks `/health/auth`, `/login` and `/auth/api/session`. Any failure after the
-switch restores the previous release and unit. The server needs no GitHub access.
+The shared `scripts/deploy-release.sh` bundles only this project's published
+mirror commit, builds a new release, and runs `deploy/release.sh`: production
+dependencies, tests as `nobody` without production env, then the switch of
+`current`, a restart and checks of `/health/auth`, `/login` and
+`/auth/api/session`. Any failure after the switch restores the previous release
+and unit. The server needs no GitHub access.
 
 The systemd service loads both existing credential files. The deployment script
 only manages this service; shared Nginx routes and auth snippets are published by

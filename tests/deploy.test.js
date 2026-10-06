@@ -52,23 +52,23 @@ test("upstream auth snippets overwrite Authorization and hide Basic challenges",
 });
 
 test("gateway deployment leaves the shared Nginx entry to server-infra", () => {
-  const deployScript = read("deploy/deploy-admin-auth-gateway.sh");
-  assert.doesNotMatch(deployScript, /\/etc\/nginx\/snippets/);
-  assert.doesNotMatch(deployScript, /\bnginx -t\b/);
-  assert.doesNotMatch(deployScript, /systemctl reload nginx/);
+  const hooks = read("deploy/release.sh");
+  assert.doesNotMatch(hooks, /\/etc\/nginx\/snippets/);
+  assert.doesNotMatch(hooks, /\bnginx -t\b/);
+  assert.doesNotMatch(hooks, /systemctl reload nginx/);
 });
 
 test("gateway deployment never rewrites server environment files", () => {
   // /etc/admin-auth-gateway.env holds server-only settings such as the WeChat AppSecret.
-  const deployScript = read("deploy/deploy-admin-auth-gateway.sh");
-  assert.doesNotMatch(deployScript, /\b(mv|cp|rm|install|tee)\b[^\n]*\/etc\/[\w.-]*\.env/);
-  assert.doesNotMatch(deployScript, />\s*\/etc\/[\w.-]*\.env/);
+  const hooks = read("deploy/release.sh").replace(/^#.*$/gm, "");
+  assert.doesNotMatch(hooks, /\b(mv|cp|rm|install|tee)\b[^\n]*\/etc\/[\w.-]*\.env/);
+  assert.doesNotMatch(hooks, />\s*\/etc\/[\w.-]*\.env/);
 });
 
-test("gateway deployment switches tested releases with rollback", () => {
-  const deployScript = read("deploy/deploy-admin-auth-gateway.sh");
-  assert.match(deployScript, /releases\/\$expected/);
-  assert.match(deployScript, /runuser -u nobody -- env -i [^\n]*node --test/);
-  assert.match(deployScript, /trap rollback ERR/);
-  assert.match(deployScript, /mv -Tf "\$app_root\/\.current-\$\$" "\$app_root\/current"/);
+test("gateway release hooks restart only the gateway and test it in isolation", () => {
+  const hooks = read("deploy/release.sh");
+  assert.match(hooks, /^SERVICES=\(admin-auth-gateway\.service\)$/m);
+  assert.match(hooks, /^UNIT_FILES=\(deploy\/systemd\/admin-auth-gateway\.service\)$/m);
+  assert.match(hooks, /^HEALTH_URL=http:\/\/127\.0\.0\.1:8790\/health\/auth$/m);
+  assert.match(hooks, /run_isolated node --test tests\/\*\.test\.js/);
 });
