@@ -159,9 +159,20 @@ reference for that historical mode.
 <nav class="topbar" aria-label="后台导航" data-admin-center="business" data-return-to="/business"></nav>
 ```
 
-`data-admin-center` 取 `business`、`expense`、`invoice`、`staff`、`store` 之一。渲染后的元素 ID（`center-trigger`、`center-menu`、`menu-backdrop`、`theme-toggle`、`logout`）与原各后台一致。显示入口只是导航，不授予任何访问权限。
+`data-admin-center` 取 `business`、`expense`、`invoice`、`staff`、`store`、`accounts` 之一。
 
-接入顺序：先部署带有外壳文件的网关，再部署接入的后台；接入后台的 `release_prepare` 会先确认线上网关已提供这三个文件。已接入：`business-data`、`employee-information`、`invoice-submit`（`/invoice` 后台）、`wechat-claw`（`/expense` 主后台）。尚未接入（顶栏含页面自有内容，需外壳先支持自定义区域）：`store-management`、报账提交页与月度/经营报表页、网关账号管理页。
+有页面自有内容的顶栏可用：
+
+| 写法 | 作用 | 例子 |
+| --- | --- | --- |
+| `data-admin-mode="brand"`（可配 `data-admin-home`） | 左侧显示中心图标加名称的链接，不显示切换菜单 | 报账提交页 |
+| 子元素 `<div data-admin-slot>…</div>` | 其中节点移到切换菜单（或品牌链接）后，中间自动加分隔线；节点是移动而非复制，页面脚本的引用和监听不变 | 门店的功能切换 |
+| 子元素 `<div data-admin-actions>…</div>` | 其中节点放在主题按钮前 | 报表页的「返回后台」 |
+| `data-account-name` | 直接交给 `user-menu.js`，不再额外请求 | 账号管理页 |
+
+二级下拉（`.report-switcher*`）的样式也由外壳提供，交互逻辑仍在各页面。渲染后的元素 ID（`center-trigger`、`center-menu`、`menu-backdrop`、`theme-toggle`、`logout`）与原各后台一致。显示入口只是导航，不授予任何访问权限。
+
+接入顺序：先部署带有外壳文件的网关，再部署接入的后台；接入后台的 `release_prepare` 会先确认线上网关已提供这三个文件。已接入：`business-data`、`employee-information`、`invoice-submit`（`/invoice` 后台）、`store-management`、`wechat-claw`（`/expense` 主后台和 `/expense/submit` 提交页）。尚未接入：报账月度/经营报表页、网关账号管理页。
 
 ## Credential changes
 

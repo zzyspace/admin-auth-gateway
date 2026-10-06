@@ -35,7 +35,7 @@ test('centers are declared once, in the canonical order and labels', () => {
   assert.deepEqual(centers.map(c => `${c.id}:${c.label}:${c.href}`), [
     'business:营业数据:/business', 'expense:报账中心:/expense', 'invoice:发票中心:/invoice', 'staff:员工中心:/staff', 'store:门店管理:/store',
   ]);
-  assert.match(shellJs, /const ACCOUNTS = \{ label: "账号管理", href: "\/auth\/accounts"/);
+  assert.match(shellJs, /const ACCOUNTS = \{ id: "accounts", label: "账号管理", href: "\/auth\/accounts"/);
   for (const center of centers) assert.match(shellCss, new RegExp(`\\[data-center="${center.id}"\\] \\{ --center-color:#[0-9a-f]{6}; \\}`), center.id);
   assert.match(shellCss, /\[data-management\] \{ --center-color:#8e8e93; \}/);
 });
@@ -54,7 +54,7 @@ test('every destination the gateway can grant is accepted by the shell', () => {
 
 test('the shell keeps the contract user-menu.js and pages rely on', () => {
   assert.match(shellJs, /document\.querySelector\("nav\.topbar\[data-admin-center\]"\)/);
-  assert.match(shellJs, /element\("form", \{ method: "post", action: "\/logout", class: "logout-form" \}\)/);
+  assert.match(shellJs, /element\("form", \{ method: "post", action: "\/logout", class: "logout-form", "data-account-name": nav\.dataset\.accountName \?\? null \}\)/);
   assert.match(shellJs, /name: "returnTo", value: returnTo/);
   assert.match(shellJs, /fetch\("\/auth\/api\/session"/);
   for (const id of ['center-switcher', 'center-trigger', 'center-menu', 'menu-backdrop', 'theme-toggle', 'logout']) assert.match(shellJs, new RegExp(`id: "${id}"|id="${id}"`), id);
@@ -67,4 +67,18 @@ test('the shell stylesheet defines every custom property it uses', () => {
   const used = new Set([...shellCss.matchAll(/var\(--([\w-]+)\)/g)].map(m => m[1]));
   const defined = new Set([...shellCss.matchAll(/--([\w-]+):/g)].map(m => m[1]));
   for (const name of used) assert.ok(defined.has(name), `--${name} is used but not defined in admin-shell.css`);
+});
+
+test('page-specific top bar content is moved, not copied, around the shared controls', () => {
+  // Slot and extra actions keep their nodes (and listeners); brand mode skips the switcher entirely.
+  assert.match(shellJs, /nav\.querySelector\(":scope > \[data-admin-slot\]"\)/);
+  assert.match(shellJs, /nav\.querySelector\(":scope > \[data-admin-actions\]"\)/);
+  assert.match(shellJs, /actions\.prepend\(\.\.\.extraActions\.childNodes\)/);
+  assert.match(shellJs, /element\("span", \{ class: "topbar-divider", "aria-hidden": "true" \}\), \.\.\.slot\.childNodes/);
+  assert.match(shellJs, /const brandMode = nav\.dataset\.adminMode === "brand"/);
+  assert.match(shellJs, /if \(brandMode\) return;/);
+  assert.match(shellJs, /\[\.\.\.CENTERS, ACCOUNTS\]\.find\(center => center\.id === nav\.dataset\.adminCenter\)/);
+  for (const selector of ['.center-brand', '.topbar-start', '.topbar-divider', '.report-switcher-trigger', '.report-switcher-menu', '.report-switcher-option']) {
+    assert.ok(shellCss.includes(`${selector} {`), selector);
+  }
 });

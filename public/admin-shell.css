@@ -68,10 +68,55 @@ body.switcher-open > .topbar { z-index:21; }
 :root[data-theme="dark"] [data-center="store"] { --center-color:#f486ad; }
 :root[data-theme="dark"] [data-management] { --center-color:#a1a1aa; }
 
+[data-center="accounts"] { --center-color:#8e8e93; }
+:root[data-theme="dark"] [data-center="accounts"] { --center-color:#a1a1aa; }
+
+/* Brand mode (data-admin-mode="brand"): the center as a plain link instead of the switcher. */
+.center-brand { display:inline-flex; align-items:center; gap:8px; min-height:36px; padding:0 7px; border-radius:10px; color:var(--ink); font-size:15px; font-weight:700; text-decoration:none; flex-shrink:0; touch-action:manipulation; }
+.center-brand .center-icon { width:22px; height:22px; color:var(--center-color); }
+.center-brand:focus-visible { outline:3px solid var(--brand); outline-offset:3px; }
+
+/* Page slot (data-admin-slot): switcher or brand, a divider, then the page's own controls. */
+.topbar-start { display:flex; align-items:center; gap:12px; min-width:0; }
+.topbar-divider { flex-shrink:0; width:1px; height:18px; background:var(--header-line); }
+
+/* Secondary dropdown in the slot (store features, expense reports); behavior stays in each page. */
+.report-switcher { position:relative; }
+.report-switcher-trigger { display:inline-flex; align-items:center; gap:7px; min-height:44px; padding:0 7px; border:0; border-radius:10px; background:transparent; color:var(--sub-ink); font-size:14px; font-weight:500; }
+.report-switcher-trigger:disabled { opacity:1; cursor:default; }
+.report-switcher-chevron { flex-shrink:0; width:15px; height:15px; }
+.report-switcher-chevron[hidden] { display:none; }
+.report-switcher.is-open .report-switcher-chevron { transform:rotate(180deg); }
+.report-switcher-menu { position:absolute; z-index:22; top:calc(100% + 10px); left:0; width:210px; padding:8px; }
+.report-switcher-option { display:grid; grid-template-columns:1fr 20px; align-items:center; gap:12px; width:100%; min-height:56px; padding:0 14px; border:0; border-radius:14px; background:transparent; color:var(--ink); font:inherit; font-size:15px; font-weight:600; text-align:left; text-decoration:none; cursor:pointer; }
+.report-switcher-option[aria-current="page"],.report-switcher-option[aria-current="true"] { background:var(--brand-soft); }
+.report-switcher-option:focus-visible { outline:2px solid var(--brand); outline-offset:-2px; background:var(--surface-muted); }
+.report-switcher-check { color:var(--brand); font-size:20px; font-weight:800; text-align:center; }
+.report-switcher-menu[hidden],.report-switcher-option[hidden],.report-switcher-backdrop[hidden] { display:none; }
+.report-switcher-backdrop { position:fixed; z-index:20; inset:0; border:0; background:rgba(28,28,30,.28); backdrop-filter:blur(2px); }
+body.report-menu-open > .topbar { z-index:21; }
+.topbar { --sub-ink:#6e6e73; }
+:root[data-theme="dark"] .topbar { --sub-ink:#aab4c3; }
+/* Both dropdowns share the menu palette. */
+.report-switcher-menu {
+  --ink:#17202a; --line:#e3e8ef; --surface-strong:#fff; --surface-muted:#f5f7fa; --brand:#007aff; --brand-soft:#eaf3ff;
+  border:1px solid var(--line); border-radius:20px; background:var(--surface-strong); color:var(--ink);
+  font-family:-apple-system,"SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif; line-height:1.5; box-shadow:0 24px 60px rgba(28,28,30,.22);
+}
+:root[data-theme="dark"] .report-switcher-menu { --ink:#f1f4f8; --line:#343942; --surface-strong:#1d2026; --surface-muted:#262a31; --brand:#72b5ff; --brand-soft:#23354c; }
+
 @media(hover:hover) and (pointer:fine) {
-  .center-switcher-trigger:not(:disabled):hover,.center-switcher-option:hover { background:var(--surface-muted); }
+  .center-switcher-trigger:not(:disabled):hover,.center-switcher-option:hover,.center-brand:hover { background:var(--surface-muted); }
+  .report-switcher-trigger:not(:disabled):hover,.report-switcher-option:hover { background:var(--surface-muted); }
   .theme-toggle:hover,.logout:hover { background:var(--header-control-hover); }
 }
+@media(max-width:740px) {
+  .topbar-start { gap:8px; }
+  .report-switcher { position:static; }
+  .report-switcher-menu { left:14px; right:auto; }
+  .report-switcher-trigger { padding:0 4px; font-size:13px; }
+}
+@media(prefers-reduced-motion:no-preference) { .report-switcher-chevron { transition:transform .18s ease; } }
 @media(max-width:650px) {
   .topbar { padding-left:max(12px,env(safe-area-inset-left)); padding-right:max(12px,env(safe-area-inset-right)); gap:8px; }
   .topbar-actions { gap:5px; }
