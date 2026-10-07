@@ -2,8 +2,9 @@
    Self-contained: it defines its own palette on .topbar and does not rely on page tokens or resets.
    Base rules use :where() so they carry no specificity over the component rules below. */
 
-/* Ignore WeChat's font-size setting, which it applies after load and makes the page jump. */
-html {
+/* Ignore WeChat's font-size setting, which it applies after load and makes the page jump.
+   WeChat on iOS writes it as an inline style on body, so body needs the !important rule too. */
+html, body {
   -webkit-text-size-adjust: 100% !important;
   text-size-adjust: 100% !important;
 }
