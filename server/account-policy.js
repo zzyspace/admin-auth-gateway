@@ -51,6 +51,14 @@ export const APP_DEFINITIONS = Object.freeze({
     dependencies: { "report:operating:summary:view": "report:view", "report:operating:edit": "report:monthly:view", "report:monthly:view": "report:view", "attachment:view": "report:view", "report:edit": "report:view", "report:delete:self": "report:view", "report:delete": "report:view", "report:import": "report:view", "task:view:any": "report:view" },
     entry: ["report:view", "report:submit"],
   },
+  // Static showcase without store data; the grant is entry-only.
+  design: {
+    label: "空间设计",
+    roles: { admin: "管理员", viewer: "查看人员" },
+    permissions: { "design:view": "查看空间设计" },
+    dependencies: {},
+    entry: ["design:view"],
+  },
 });
 
 export class AccountPolicyError extends AccountStoreError {
@@ -103,6 +111,7 @@ export function accessDestination(app, access) {
   if (!access?.enabled) return null;
   if (app === "business" && access.permissions.includes("revenue:view")) return "/business";
   if (app === "store" && access.permissions.includes("coupon:view")) return "/store";
+  if (app === "design" && access.permissions.includes("design:view")) return "/design/";
   if (app === "invoice" && access.permissions.includes("submission:view")) return "/invoice";
   if (app === "staff" && access.permissions.includes("employee:view")) return "/staff";
   if (app === "expense") {
@@ -172,7 +181,7 @@ export function normalizeManagedAccess(body, existing) {
     };
   } else {
     const selectedStores = selections(body, "viewStores", Object.keys(STORE_DEFINITIONS));
-    const stores = body.app === "store" && ["admin", "partner"].includes(role)
+    const stores = body.app === "design" || body.app === "store" && ["admin", "partner"].includes(role)
       ? Object.keys(STORE_DEFINITIONS) : selectedStores;
     if (enabled && stores.length === 0) fail("empty-view-scope", "已启用后台访问，请至少选择一个可管理门店。");
     config = { viewScope: { ownership: "any", stores: normalizedStores(stores) } };

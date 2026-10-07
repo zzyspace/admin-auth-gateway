@@ -90,7 +90,7 @@ test("all app grants can be disabled with the omitted controls produced by the m
 });
 
 test("initial disabled grants have no permissions or scope when browser controls are omitted", () => {
-  const roles = { business: "viewer", invoice: "viewer", staff: "viewer", store: "manager", expense: "partner" };
+  const roles = { business: "viewer", invoice: "viewer", staff: "viewer", store: "manager", expense: "partner", design: "viewer" };
   for (const app of Object.keys(APP_DEFINITIONS)) {
     const access = normalizeManagedAccess({ accountId: "person", app, permissions: ["forged:write"], viewStores: ["peanut"] });
     assert.equal(access.enabled, false);
@@ -143,4 +143,13 @@ test("operating summary viewing is independent of monthly viewing and editing", 
   assert.ok(!access.permissions.includes("report:operating:edit"));
   assert.throws(() => normalizeManagedAccess({ ...body, permissions: ["report:operating:summary:view"] }), /missing-permission-dependency/);
   assert.ok(!normalizeManagedAccess({ ...body, role: "admin", permissions: ["report:view", "report:monthly:view"] }).permissions.includes("report:operating:summary:view"));
+});
+
+test("design grants need only the view permission, cover all stores and open the standalone viewer", () => {
+  const access = normalizeManagedAccess({ accountId: "person", app: "design", enabled: "1", role: "viewer", permissions: ["design:view"] });
+  assert.deepEqual(access.permissions, ["design:view"]);
+  assert.equal(access.config.viewScope.stores, "all");
+  assert.equal(accessDestination("design", access), "/design/");
+  assert.throws(() => normalizeManagedAccess({ accountId: "person", app: "design", enabled: "1", role: "viewer", permissions: [] }), /missing-entry-permission/);
+  assert.equal(accessDestination("design", { ...access, enabled: false }), null);
 });
