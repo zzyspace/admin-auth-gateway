@@ -2,6 +2,12 @@
    Self-contained: it defines its own palette on .topbar and does not rely on page tokens or resets.
    Base rules use :where() so they carry no specificity over the component rules below. */
 
+/* Ignore WeChat's font-size setting, which it applies after load and makes the page jump. */
+html {
+  -webkit-text-size-adjust: 100% !important;
+  text-size-adjust: 100% !important;
+}
+
 /* Shared page background: a viewport-fixed gradient behind the page, so it does not stretch with
    long lists. Pages must not set their own body background. */
 :root {
