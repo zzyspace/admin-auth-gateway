@@ -39,3 +39,14 @@ test("adding business preserves all four previous apps, accounts, versions and a
   store.putAccess(normalizeManagedAccess({ accountId: "a", app: "business", role: "viewer", enabled: "1", permissions: ["revenue:view"], viewStores: ["fuzzy", "fuzzy_qz", "peanut"] }), { actor: "test", expectedVersion: 0 });
   assert.equal(store.getAccess("a", "business").config.viewScope.stores, "all"); store.close();
 });
+test("the demo store is explicit-only and limited to business and store", () => {
+  const body = { accountId: "a", app: "business", enabled: "1", role: "viewer", permissions: ["revenue:view"] };
+  assert.deepEqual(normalizeManagedAccess({ ...body, viewStores: ["demo"] }).config.viewScope.stores, ["demo"]);
+  assert.deepEqual(normalizeManagedAccess({ ...body, viewStores: ["fuzzy", "fuzzy_qz", "peanut", "demo"] }).config.viewScope.stores, ["demo", "fuzzy", "fuzzy_qz", "peanut"]);
+  assert.equal(normalizeManagedAccess({ ...body, viewStores: ["fuzzy", "fuzzy_qz", "peanut"] }).config.viewScope.stores, "all");
+  const store = { accountId: "a", app: "store", enabled: "1", permissions: ["coupon:view"], viewStores: ["demo"] };
+  assert.deepEqual(normalizeManagedAccess({ ...store, role: "manager" }).config.viewScope.stores, ["demo"]);
+  assert.equal(normalizeManagedAccess({ ...store, role: "partner" }).config.viewScope.stores, "all");
+  assert.throws(() => normalizeManagedAccess({ accountId: "a", app: "staff", enabled: "1", role: "viewer", permissions: ["employee:view"], viewStores: ["demo"] }));
+  assert.throws(() => normalizeManagedAccess({ accountId: "a", app: "invoice", enabled: "1", role: "viewer", permissions: ["submission:view"], viewStores: ["demo"] }));
+});

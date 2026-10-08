@@ -6,6 +6,12 @@ export const STORE_DEFINITIONS = Object.freeze({
   peanut: "Peanut",
 });
 
+// A fictional store for the WeChat mini program review account. It is never
+// part of "all": only an explicit grant in one of these apps can reach it.
+export const DEMO_STORE = "demo";
+export const DEMO_STORE_LABEL = "演示门店";
+export const DEMO_STORE_APPS = Object.freeze(["business", "store"]);
+
 export const EXPENSE_CHANNELS = Object.freeze({
   reimbursement_fuzzy: { label: "普通报账", store: "fuzzy" },
   reimbursement_fuzzy_manager: { label: "店长报账", store: "fuzzy" },
@@ -83,7 +89,7 @@ function selections(body, name, allowed) {
 function normalizedStores(values) {
   const all = Object.keys(STORE_DEFINITIONS);
   const selected = [...new Set(values)].sort();
-  return selected.length === all.length ? "all" : selected;
+  return selected.length === all.length && !selected.includes(DEMO_STORE) ? "all" : selected;
 }
 
 function normalizedExpenseScope(channelCodes, ownership) {
@@ -180,7 +186,8 @@ export function normalizeManagedAccess(body, existing) {
       importScope: normalizedExpenseScope(importChannels),
     };
   } else {
-    const selectedStores = selections(body, "viewStores", Object.keys(STORE_DEFINITIONS));
+    const selectableStores = DEMO_STORE_APPS.includes(body.app) ? [...Object.keys(STORE_DEFINITIONS), DEMO_STORE] : Object.keys(STORE_DEFINITIONS);
+    const selectedStores = selections(body, "viewStores", selectableStores);
     const stores = body.app === "design" || body.app === "store" && ["admin", "partner"].includes(role)
       ? Object.keys(STORE_DEFINITIONS) : selectedStores;
     if (enabled && stores.length === 0) fail("empty-view-scope", "已启用后台访问，请至少选择一个可管理门店。");
